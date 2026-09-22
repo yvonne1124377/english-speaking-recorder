@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>English Speaking Recorder</title>
+  <style>
+    :root {
+      --bg: #f5f5f2;
+      --card: #ffffff;
+      --text: #222;
+      --muted: #6f6f6f;
+      --line: #deded8;
+      --accent: #222;
+      --danger: #b42318;
+      --ok: #1f7a4d;
+      --soft: #efefea;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .wrap {
+      width: min(760px, calc(100% - 28px));
+      margin: 36px auto 56px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: 0 6px 20px rgba(0,0,0,.04);
+    }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 5vw, 42px); letter-spacing: -.02em; }
+    h2 { margin: 0 0 10px; font-size: 22px; }
+    p { margin: 8px 0; }
+    .muted { color: var(--muted); }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin: 22px 0 26px;
+    }
+    .step {
+      background: var(--soft);
+      border-radius: 12px;
+      padding: 10px 8px;
+      text-align: center;
+      font-size: 13px;
+    }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .field { margin: 18px 0; }
+    label { display: block; font-weight: 650; margin-bottom: 7px; }
+    input[type="text"], textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font: inherit;
+      background: #fff;
+    }
+    textarea { min-height: 130px; resize: vertical; }
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+    }
+    button.secondary { background: var(--soft); color: var(--text); }
+    button.danger { background: var(--danger); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .record-btn {
+      min-width: 180px;
+      font-size: 18px;
+      padding: 15px 24px;
+    }
+    .status {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: var(--soft);
+      color: var(--muted);
+    }
+    .status.recording { color: var(--danger); font-weight: 700; }
+    .status.ok { color: var(--ok); font-weight: 700; }
+    .status.error { color: var(--danger); font-weight: 700; }
+    .panel {
+      margin-top: 22px;
+      border-top: 1px solid var(--line);
+      padding-top: 22px;
+    }
+    audio { width: 100%; margin: 8px 0 14px; }
+    .transcript-box {
+      white-space: pre-wrap;
+      background: var(--soft);
+      border-radius: 14px;
+      padding: 16px;
+      min-height: 80px;
+    }
+    .share-box {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .share-box input { flex: 1; }
+    .badge {
+      display: inline-block;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: var(--soft);
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .hidden { display: none !important; }
+    .viewer-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 18px 0;
+    }
+    .meta-item {
+      background: var(--soft);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .meta-label { font-size: 12px; color: var(--muted); }
+    .meta-value { font-weight: 700; margin-top: 2px; }
+    .footer-note {
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    @media (max-width: 640px) {
+      .wrap { margin-top: 18px; }
+      .card { padding: 20px; border-radius: 14px; }
+      .steps { grid-template-columns: 1fr 1fr; }
+      .viewer-meta { grid-template-columns: 1fr; }
+      .share-box { flex-direction: column; }
+      .share-box button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <div id="studentView">
+        <span class="badge">No sign-in required</span>
+        <h1>🎙️ English Speaking Recorder</h1>
+        <p class="muted">Record your English, check what the computer heard, then share your recording with your teacher.</p>
+
+        <div class="steps">
+          <div class="step">1. Record</div>
+          <div class="step">2. Speak</div>
+          <div class="step">3. Check</div>
+          <div class="step">4. Listen</div>
+          <div class="step">5. Share</div>
+        </div>
+
+        <div class="field">
+          <label for="studentId">Seat No. / Student ID <span class="muted">(optional)</span></label>
+          <input id="studentId" type="text" maxlength="30" placeholder="e.g. 12" />
+        </div>
+
+        <div class="field">
+          <label for="taskName">Task <span class="muted">(optional)</span></label>
+          <input id="taskName" type="text" maxlength="80" placeholder="e.g. Small Talk 1" />
+        </div>
+
+        <div class="row">
+          <button id="recordBtn" class="record-btn">● Start Recording</button>
+          <button id="stopBtn" class="record-btn danger hidden">■ Stop</button>
+        </div>
+        <div id="status" class="status">Use Chrome for the best transcription support.</div>
+
+        <section id="resultPanel" class="panel hidden">
+          <h2>Listen to your recording</h2>
+          <audio id="audioPlayer" controls></audio>
+
+          <h2>Your transcript</h2>
+          <p class="muted">Did the computer understand what you said? You can edit obvious punctuation or spelling before sharing.</p>
+          <textarea id="transcript" placeholder="Your transcript will appear here..."></textarea>
+
+          <div class="row" style="margin-top:14px;">
+            <button id="recordAgainBtn" class="secondary">↻ Record Again</button>
+            <button id="shareBtn">🔗 Get Sharing Link</button>
+          </div>
+        </section>
+
+        <section id="sharePanel" class="panel hidden">
+          <h2>Your sharing link</h2>
+          <p class="muted">Submit this link to your teacher.</p>
+          <div class="share-box">
+            <input id="shareUrl" type="text" readonly />
+            <button id="copyBtn">Copy Link</button>
+          </div>
+        </section>
+
+        <p class="footer-note">Privacy tip: use seat numbers instead of full names.</p>
+      </div>
+
+      <div id="viewerView" class="hidden">
+        <span class="badge">Shared recording</span>
+        <h1>🎧 Student Recording</h1>
+        <div id="viewerStatus" class="status">Loading...</div>
+
+        <div id="viewerContent" class="hidden">
+          <div class="viewer-meta">
+            <div class="meta-item">
+              <div class="meta-label">Seat No. / Student ID</div>
+              <div id="viewerStudentId" class="meta-value">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Task</div>
+              <div id="viewerTaskName" class="meta-value">—</div>
+            </div>
+          </div>
+
+          <h2>Recording</h2>
+          <audio id="viewerAudio" controls></audio>
+
+          <h2>Transcript</h2>
+          <div id="viewerTranscript" class="transcript-box"></div>
+
+          <p id="viewerDate" class="footer-note"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    /***********************************************************
+     * 1) SUPABASE SETTINGS
+     * Replace these three values after you create your project.
+     ***********************************************************/
+    const SUPABASE_URL = 'https://cufnvllcqoppwydygond.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_yaIZpMakh4r91DApqBcIbQ_wyGjNxX6';
+    const BUCKET_NAME = 'RECORDING';
+
+    /***********************************************************
+     * App state
+     ***********************************************************/
+    let mediaRecorder = null;
+    let mediaStream = null;
+    let audioChunks = [];
+    let audioBlob = null;
+    let recognition = null;
+    let finalTranscript = '';
+    let interimTranscript = '';
+    let isRecording = false;
+
+    const $ = (id) => document.getElementById(id);
+
+    const studentView = $('studentView');
+    const viewerView = $('viewerView');
+    const recordBtn = $('recordBtn');
+    const stopBtn = $('stopBtn');
+    const statusBox = $('status');
+    const resultPanel = $('resultPanel');
+    const sharePanel = $('sharePanel');
+    const audioPlayer = $('audioPlayer');
+    const transcriptBox = $('transcript');
+    const shareBtn = $('shareBtn');
+    const recordAgainBtn = $('recordAgainBtn');
+    const copyBtn = $('copyBtn');
+    const shareUrlBox = $('shareUrl');
+
+    function setStatus(message, type = '') {
+      statusBox.textContent = message;
+      statusBox.className = 'status' + (type ? ` ${type}` : '');
+    }
+
+    function randomId(length = 12) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+      const arr = new Uint32Array(length);
+      crypto.getRandomValues(arr);
+      return Array.from(arr, n => chars[n % chars.length]).join('');
+    }
+
+    function extensionFromMime(mime) {
+      if (mime.includes('ogg')) return 'ogg';
+      if (mime.includes('mp4')) return 'm4a';
+      return 'webm';
+    }
+
+    function getSpeechRecognitionClass() {
+      return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    }
+
+    function setupRecognition() {
+      const SpeechRecognition = getSpeechRecognitionClass();
+      if (!SpeechRecognition) {
+        recognition = null;
+        return;
+      }
+
+      recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event) => {
+        interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const text = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += text + ' ';
+          } else {
+            interimTranscript += text;
+          }
+        }
+        transcriptBox.value = (finalTranscript + interimTranscript).trim();
+      };
+
+      recognition.onerror = (event) => {
+        console.warn('Speech recognition error:', event.error);
+      };
+
+      recognition.onend = () => {
+        if (isRecording) {
+          try { recognition.start(); } catch (e) {}
+        }
+      };
+    }
+
+    async function startRecording() {
+      sharePanel.classList.add('hidden');
+      resultPanel.classList.add('hidden');
+      finalTranscript = '';
+      interimTranscript = '';
+      transcriptBox.value = '';
+      audioChunks = [];
+      audioBlob = null;
+
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        const preferredTypes = [
+          'audio/webm;codecs=opus',
+          'audio/webm',
+          'audio/mp4',
+          'audio/ogg;codecs=opus'
+        ];
+        const mimeType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t)) || '';
+
+        mediaRecorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const type = mediaRecorder.mimeType || 'audio/webm';
+          audioBlob = new Blob(audioChunks, { type });
+          audioPlayer.src = URL.createObjectURL(audioBlob);
+          resultPanel.classList.remove('hidden');
+          setStatus('Recording finished. Listen and check your transcript.', 'ok');
+          if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+        };
+
+        setupRecognition();
+        if (recognition) {
+          try { recognition.start(); } catch (e) {}
+        }
+
+        mediaRecorder.start(250);
+        isRecording = true;
+        recordBtn.classList.add('hidden');
+        stopBtn.classList.remove('hidden');
+        setStatus('Recording... Speak clearly in English.', 'recording');
+      } catch (err) {
+        console.error(err);
+        setStatus('Microphone access failed. Please allow microphone permission and try again.', 'error');
+      }
+    }
+
+    function stopRecording() {
+      if (!isRecording) return;
+      isRecording = false;
+
+      if (recognition) {
+        try { recognition.stop(); } catch (e) {}
+      }
+
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+
+      stopBtn.classList.add('hidden');
+      recordBtn.classList.remove('hidden');
+    }
+
+    function resetForNewRecording() {
+      sharePanel.classList.add('hidden');
+      resultPanel.classList.add('hidden');
+      audioPlayer.removeAttribute('src');
+      audioPlayer.load();
+      transcriptBox.value = '';
+      finalTranscript = '';
+      interimTranscript = '';
+      audioBlob = null;
+      setStatus('Ready. Press Start Recording when you are ready.');
+    }
+
+    function checkConfig() {
+      return !SUPABASE_URL.includes('PASTE_YOUR') && !SUPABASE_ANON_KEY.includes('PASTE_YOUR');
+    }
+
+    async function uploadToSupabase(path, body, contentType) {
+      const url = `${SUPABASE_URL}/storage/v1/object/${BUCKET_NAME}/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY,
+          'Content-Type': contentType,
+          'x-upsert': 'false'
+        },
+        body
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Upload failed (${res.status}): ${text}`);
+      }
+      return res.json().catch(() => ({}));
+    }
+
+    function publicObjectUrl(path) {
+      return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${path}`;
+    }
+
+    async function createShareLink() {
+      if (!audioBlob) {
+        setStatus('Please make a recording first.', 'error');
+        return;
+      }
+      if (!checkConfig()) {
+        setStatus('Supabase is not connected yet. Add your Supabase URL and anon key in index.html first.', 'error');
+        return;
+      }
+
+      shareBtn.disabled = true;
+      shareBtn.textContent = 'Uploading...';
+      setStatus('Uploading your recording...', '');
+
+      try {
+        const id = randomId();
+        const ext = extensionFromMime(audioBlob.type || 'audio/webm');
+        const audioPath = `${id}.${ext}`;
+        const metaPath = `${id}.json`;
+
+        const meta = {
+          id,
+          studentId: $('studentId').value.trim(),
+          taskName: $('taskName').value.trim(),
+          transcript: transcriptBox.value.trim(),
+          audioPath,
+          mimeType: audioBlob.type || 'audio/webm',
+          createdAt: new Date().toISOString()
+        };
+
+        await uploadToSupabase(audioPath, audioBlob, meta.mimeType);
+        await uploadToSupabase(metaPath, new Blob([JSON.stringify(meta)], { type: 'application/json' }), 'application/json');
+
+        const base = `${location.origin}${location.pathname}`;
+        const shareUrl = `${base}?id=${encodeURIComponent(id)}`;
+        shareUrlBox.value = shareUrl;
+        sharePanel.classList.remove('hidden');
+        setStatus('Your sharing link is ready.', 'ok');
+      } catch (err) {
+        console.error(err);
+        setStatus('Upload failed. Please try again or tell your teacher.', 'error');
+      } finally {
+        shareBtn.disabled = false;
+        shareBtn.textContent = '🔗 Get Sharing Link';
+      }
+    }
+
+    async function copyShareLink() {
+      const value = shareUrlBox.value;
+      if (!value) return;
+      try {
+        await navigator.clipboard.writeText(value);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => copyBtn.textContent = 'Copy Link', 1400);
+      } catch (e) {
+        shareUrlBox.select();
+        document.execCommand('copy');
+      }
+    }
+
+    async function loadSharedRecording(id) {
+      studentView.classList.add('hidden');
+      viewerView.classList.remove('hidden');
+      const viewerStatus = $('viewerStatus');
+      const viewerContent = $('viewerContent');
+
+      if (!checkConfig()) {
+        viewerStatus.textContent = 'This site is not connected to Supabase yet.';
+        viewerStatus.className = 'status error';
+        return;
+      }
+
+      try {
+        const metaUrl = publicObjectUrl(`${id}.json`);
+        const res = await fetch(metaUrl, { cache: 'no-store' });
+        if (!res.ok) throw new Error('Recording not found');
+        const meta = await res.json();
+
+        $('viewerStudentId').textContent = meta.studentId || '—';
+        $('viewerTaskName').textContent = meta.taskName || '—';
+        $('viewerTranscript').textContent = meta.transcript || '(No transcript available)';
+        $('viewerAudio').src = publicObjectUrl(meta.audioPath);
+        $('viewerDate').textContent = meta.createdAt
+          ? `Recorded: ${new Date(meta.createdAt).toLocaleString()}`
+          : '';
+
+        viewerStatus.textContent = 'Recording loaded.';
+        viewerStatus.className = 'status ok';
+        viewerContent.classList.remove('hidden');
+      } catch (err) {
+        console.error(err);
+        viewerStatus.textContent = 'This recording could not be found or has been removed.';
+        viewerStatus.className = 'status error';
+      }
+    }
+
+    recordBtn.addEventListener('click', startRecording);
+    stopBtn.addEventListener('click', stopRecording);
+    recordAgainBtn.addEventListener('click', resetForNewRecording);
+    shareBtn.addEventListener('click', createShareLink);
+    copyBtn.addEventListener('click', copyShareLink);
+
+    const params = new URLSearchParams(location.search);
+    const sharedId = params.get('id');
+    if (sharedId) {
+      loadSharedRecording(sharedId);
+    }
+  </script>
+</body>
+</html>
