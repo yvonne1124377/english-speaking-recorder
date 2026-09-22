@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>English Speaking Recorder</title>
+  <title>英語口說錄音工具｜中文＋單字解釋版</title>
   <style>
     :root {
       --bg: #f5f5f2;
@@ -140,6 +140,22 @@
       color: var(--muted);
       margin-bottom: 6px;
     }
+    .meaning-box {
+      background: #f7f7f3;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin: 10px 0 4px;
+    }
+    .meaning-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .meaning-value {
+      font-weight: 700;
+      line-height: 1.5;
+    }
     .correction-card {
       background: var(--soft);
       border-radius: 14px;
@@ -205,111 +221,115 @@
   <main class="wrap">
     <section class="card">
       <div id="studentView">
-        <span class="badge">No sign-in required</span>
-        <h1>🎙️ English Speaking Recorder</h1>
-        <p class="muted">Record your English, check what the computer heard, then share your recording with your teacher.</p>
+        <span class="badge">免登入即可使用</span>
+        <h1>🎙️ 英語口說錄音工具</h1>
+        <p class="muted">錄下你的英文，檢查 AI 聽到的內容，再將錄音分享給老師。</p>
 
         <div class="steps">
-          <div class="step">1. Record</div>
-          <div class="step">2. Speak</div>
-          <div class="step">3. Check</div>
-          <div class="step">4. Listen</div>
-          <div class="step">5. Share</div>
+          <div class="step">1. 錄音</div>
+          <div class="step">2. 說英文</div>
+          <div class="step">3. 檢查</div>
+          <div class="step">4. 聆聽</div>
+          <div class="step">5. 分享</div>
         </div>
 
         <div class="field">
-          <label for="studentId">Student Name <span class="required">(required)</span></label>
+          <label for="studentId">學生姓名 <span class="required">（必填）</span></label>
           <input id="studentId" type="text" maxlength="30" placeholder="e.g. 王小明" required />
         </div>
 
         <div class="field">
-          <label for="taskName">Task <span class="required">(required)</span></label>
+          <label for="taskName">作業名稱 <span class="required">（必填）</span></label>
           <input id="taskName" type="text" maxlength="80" placeholder="e.g. 高頻U1 11-20" required />
         </div>
 
         <div class="row">
-          <button id="recordBtn" class="record-btn">● Start Recording</button>
-          <button id="stopBtn" class="record-btn danger hidden">■ Stop</button>
+          <button id="recordBtn" class="record-btn">● 開始錄音</button>
+          <button id="stopBtn" class="record-btn danger hidden">■ 停止</button>
         </div>
-        <div id="status" class="status">For the most reliable transcript, use Chrome on a computer. iPhone browsers may be less consistent.</div>
+        <div id="status" class="status">為了讓 AI 辨識較穩定，建議使用電腦版 Chrome。iPhone 瀏覽器的辨識結果可能較不穩定。</div>
 
         <section id="resultPanel" class="panel hidden">
-          <h2>Listen to your recording</h2>
+          <h2>聽聽你的錄音</h2>
           <audio id="audioPlayer" controls></audio>
 
-          <h2>Your transcript</h2>
-          <p class="muted">If AI heard a word incorrectly, tap that word. Listen to the correct pronunciation, then record that word again.</p>
+          <h2>AI 辨識文字</h2>
+          <p class="muted">點選單字可查看老師提供的中文意思；如果 AI 把某個字聽錯了，再聽正確發音並單獨重錄該字。</p>
 
           <div class="field">
-            <div class="compare-label">AI transcript — tap a wrong word</div>
+            <div class="compare-label">AI 辨識結果 — 點單字可查看中文意思／進行發音修正</div>
             <div id="wordEditor" class="word-editor"></div>
           </div>
 
           <div id="correctionEditor" class="correction-editor hidden">
-            <div class="correction-title">Pronunciation correction</div>
-            <div class="correction-meta">AI heard: <strong id="heardWord">—</strong></div>
+            <div class="correction-title">發音修正</div>
+            <div class="correction-meta">AI 聽成：<strong id="heardWord">—</strong></div>
+            <div id="wordMeaningBox" class="meaning-box hidden">
+              <div class="meaning-label">中文意思</div>
+              <div id="wordMeaning" class="meaning-value"></div>
+            </div>
             <div class="field">
-              <label for="intendedWord">What word did you mean?</label>
+              <label for="intendedWord">你原本要說哪個字？</label>
               <input id="intendedWord" type="text" maxlength="40" placeholder="e.g. thought" />
             </div>
             <div class="row">
-              <button id="listenWordBtn" type="button" class="secondary">🔊 Listen</button>
-              <button id="recordWordBtn" type="button">🎙️ Record this word</button>
-              <button id="stopWordBtn" type="button" class="danger hidden">■ Stop</button>
-              <button id="cancelCorrectionBtn" type="button" class="secondary">Cancel</button>
+              <button id="listenWordBtn" type="button" class="secondary">🔊 聽正確發音</button>
+              <button id="recordWordBtn" type="button">🎙️ 重錄這個字</button>
+              <button id="stopWordBtn" type="button" class="danger hidden">■ 停止</button>
+              <button id="cancel修正Btn" type="button" class="secondary">取消</button>
             </div>
-            <div id="correctionStatus" class="mini-status">Enter the correct word, listen, then record it once.</div>
+            <div id="correctionStatus" class="mini-status">輸入正確單字，先聽正確發音，再錄一次。</div>
             <audio id="correctionPreview" controls class="hidden"></audio>
           </div>
 
           <div id="correctionsList" class="field hidden">
-            <div class="compare-label">Your pronunciation corrections</div>
+            <div class="compare-label">你的發音修正</div>
             <div id="correctionsCards"></div>
           </div>
 
           <div class="row" style="margin-top:14px;">
-            <button id="recordAgainBtn" class="secondary">↻ Record Again</button>
-            <button id="shareBtn">🔗 Get Sharing Link</button>
+            <button id="recordAgainBtn" class="secondary">↻ 整段重錄</button>
+            <button id="shareBtn">🔗 取得分享網址</button>
           </div>
         </section>
 
         <section id="sharePanel" class="panel hidden">
-          <h2>Your sharing link</h2>
-          <p class="muted">Submit this link to your teacher.</p>
+          <h2>你的分享網址</h2>
+          <p class="muted">請將這個網址繳交給老師。</p>
           <div class="share-box">
             <input id="shareUrl" type="text" readonly />
-            <button id="copyBtn">Copy Link</button>
+            <button id="copyBtn">複製網址</button>
           </div>
         </section>
 
-        <p class="footer-note">Please enter your real name and the assigned task name before recording.</p>
+        <p class="footer-note">錄音前請填寫真實姓名與指定的作業名稱。</p>
       </div>
 
       <div id="viewerView" class="hidden">
-        <span class="badge">Shared recording</span>
-        <h1>🎧 Student Recording</h1>
-        <div id="viewerStatus" class="status">Loading...</div>
+        <span class="badge">分享錄音</span>
+        <h1>🎧 學生錄音</h1>
+        <div id="viewerStatus" class="status">載入中…</div>
 
         <div id="viewerContent" class="hidden">
           <div class="viewer-meta">
             <div class="meta-item">
-              <div class="meta-label">Student Name</div>
+              <div class="meta-label">學生姓名</div>
               <div id="viewerStudentId" class="meta-value">—</div>
             </div>
             <div class="meta-item">
-              <div class="meta-label">Task</div>
+              <div class="meta-label">作業名稱</div>
               <div id="viewerTaskName" class="meta-value">—</div>
             </div>
           </div>
 
-          <h2>Recording</h2>
+          <h2>完整錄音</h2>
           <audio id="viewerAudio" controls></audio>
 
-          <h2>AI Transcript</h2>
+          <h2>AI 辨識文字</h2>
           <div id="viewerAiTranscript" class="transcript-box"></div>
 
-          <h2 style="margin-top:22px;">Pronunciation Corrections</h2>
-          <div id="viewerCorrections"></div>
+          <h2 style="margin-top:22px;">發音修正紀錄</h2>
+          <div id="viewer修正s"></div>
 
           <p id="viewerDate" class="footer-note"></p>
         </div>
@@ -328,6 +348,31 @@
     let ACTIVE_BUCKET = null;
 
     /***********************************************************
+     * 老師自訂單字中文解釋
+     * ---------------------------------------------------------
+     * 只要在下面加入：
+     *   "英文單字": "中文意思",
+     * 學生點到該字時就會看到中文。
+     * 建議只放本課／本次作業需要的重點字，不要一次放太多。
+     ***********************************************************/
+    const TEACHER_VOCAB = {
+      "matter": "事情；問題；要緊",
+      "pick": "挑選；選擇",
+      "online": "線上的；在線上",
+      "member": "成員；會員",
+      "clerk": "店員；職員",
+      "program": "節目；計畫；程式",
+      "decide": "決定",
+      "decision": "決定；決策",
+      "common": "常見的；共同的",
+      "course": "課程；一道菜",
+      "deal": "處理；交易",
+      "experience": "經驗；經歷",
+      "thought": "想；認為（think 的過去式／過去分詞）",
+      "world": "世界"
+    };
+
+    /***********************************************************
      * App state
      ***********************************************************/
     let mediaRecorder = null;
@@ -341,7 +386,7 @@
     let aiTranscriptText = '';
     let transcriptTokens = [];
     let corrections = [];
-    let selectedCorrectionIndex = null;
+    let selected修正Index = null;
     let correctionRecorder = null;
     let correctionStream = null;
     let correctionChunks = [];
@@ -361,11 +406,13 @@
     const wordEditor = $('wordEditor');
     const correctionEditor = $('correctionEditor');
     const heardWord = $('heardWord');
+    const wordMeaningBox = $('wordMeaningBox');
+    const wordMeaning = $('wordMeaning');
     const intendedWord = $('intendedWord');
     const listenWordBtn = $('listenWordBtn');
     const recordWordBtn = $('recordWordBtn');
     const stopWordBtn = $('stopWordBtn');
-    const cancelCorrectionBtn = $('cancelCorrectionBtn');
+    const cancel修正Btn = $('cancel修正Btn');
     const correctionStatus = $('correctionStatus');
     const correctionPreview = $('correctionPreview');
     const correctionsList = $('correctionsList');
@@ -441,7 +488,7 @@
       const studentName = $('studentId').value.trim();
       const taskName = $('taskName').value.trim();
       if (!studentName || !taskName) {
-        setStatus('Please enter your real name and task before recording.', 'error');
+        setStatus('請先填寫真實姓名與作業名稱，再開始錄音。', 'error');
         if (!studentName) $('studentId').focus();
         else $('taskName').focus();
         return;
@@ -454,7 +501,7 @@
       aiTranscriptText = '';
       transcriptTokens = [];
       corrections = [];
-      selectedCorrectionIndex = null;
+      selected修正Index = null;
       wordEditor.innerHTML = '';
       correctionEditor.classList.add('hidden');
       correctionsList.classList.add('hidden');
@@ -500,10 +547,10 @@
         isRecording = true;
         recordBtn.classList.add('hidden');
         stopBtn.classList.remove('hidden');
-        setStatus('Recording... Speak clearly in English.', 'recording');
+        setStatus('錄音中…請清楚地說英文。', 'recording');
       } catch (err) {
         console.error(err);
-        setStatus('Microphone access failed. Please allow microphone permission and try again.', 'error');
+        setStatus('無法使用麥克風。請允許麥克風權限後再試一次。', 'error');
       }
     }
 
@@ -512,9 +559,9 @@
       buildWordEditor(aiTranscriptText);
       resultPanel.classList.remove('hidden');
       if (aiTranscriptText) {
-        setStatus('Recording finished. Listen and check your transcript.', 'ok');
+        setStatus('錄音完成。請先重聽，再檢查 AI 辨識結果。', 'ok');
       } else {
-        setStatus('Recording finished. No transcript was detected. You can record again, preferably in Chrome on a computer.', 'error');
+        setStatus('錄音完成，但沒有辨識到文字。你可以重新錄音，建議使用電腦版 Chrome。', 'error');
       }
     }
 
@@ -525,7 +572,7 @@
       if (recognition) {
         try { recognition.stop(); } catch (e) {}
       }
-      setStatus('Finishing your recording and transcript...', '');
+      setStatus('正在完成錄音與文字辨識…', '');
 
       if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
@@ -543,7 +590,7 @@
       aiTranscriptText = '';
       transcriptTokens = [];
       corrections = [];
-      selectedCorrectionIndex = null;
+      selected修正Index = null;
       wordEditor.innerHTML = '';
       correctionEditor.classList.add('hidden');
       correctionsList.classList.add('hidden');
@@ -552,9 +599,9 @@
       interimTranscript = '';
       if (pendingFinalizeTimer) { clearTimeout(pendingFinalizeTimer); pendingFinalizeTimer = null; }
       audioBlob = null;
-      setStatus('Ready. Press Start Recording when you are ready.');
+      setStatus('準備完成。準備好後請按「開始錄音」。');
       shareBtn.disabled = false;
-      shareBtn.textContent = '🔗 Get Sharing Link';
+      shareBtn.textContent = '🔗 取得分享網址';
     }
 
     function tokenizeTranscript(text) {
@@ -570,17 +617,17 @@
     function renderWordEditor() {
       wordEditor.innerHTML = '';
       if (!transcriptTokens.length) {
-        wordEditor.textContent = '(No transcript detected)';
+        wordEditor.textContent = '（未辨識到文字）';
         return;
       }
       transcriptTokens.forEach((item) => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        const hasCorrection = corrections.some(c => c.tokenIndex === item.index && c.audioBlob);
-        btn.className = 'word-chip' + (hasCorrection ? ' corrected' : '');
+        const has修正 = corrections.some(c => c.tokenIndex === item.index && c.audioBlob);
+        btn.className = 'word-chip' + (has修正 ? ' corrected' : '');
         btn.textContent = item.token;
-        btn.title = hasCorrection ? 'Correction recorded' : 'Tap if AI heard this word incorrectly';
-        btn.addEventListener('click', () => openCorrectionEditor(item.index));
+        btn.title = has修正 ? '已完成修正錄音' : '如果 AI 聽錯這個字，請點選';
+        btn.addEventListener('click', () => open修正Editor(item.index));
         wordEditor.appendChild(btn);
       });
     }
@@ -589,15 +636,32 @@
       return word.replace(/^[^A-Za-z'-]+|[^A-Za-z'-]+$/g, '');
     }
 
-    function openCorrectionEditor(tokenIndex) {
-      selectedCorrectionIndex = tokenIndex;
+    function getChineseMeaning(word) {
+      const key = cleanWordForSpeech(word || '').toLowerCase();
+      return TEACHER_VOCAB[key] || '';
+    }
+
+    function updateMeaningDisplay(word) {
+      const meaning = getChineseMeaning(word);
+      if (meaning) {
+        wordMeaning.textContent = meaning;
+        wordMeaningBox.classList.remove('hidden');
+      } else {
+        wordMeaning.textContent = '';
+        wordMeaningBox.classList.add('hidden');
+      }
+    }
+
+    function open修正Editor(tokenIndex) {
+      selected修正Index = tokenIndex;
       const token = transcriptTokens[tokenIndex]?.token || '';
       const existing = corrections.find(c => c.tokenIndex === tokenIndex);
       heardWord.textContent = token;
       intendedWord.value = existing?.intendedWord || cleanWordForSpeech(token);
+      updateMeaningDisplay(intendedWord.value || token);
       correctionStatus.textContent = existing?.audioBlob
-        ? 'A correction recording is already saved for this word. You can record it again.'
-        : 'Enter the correct word, listen, then record it once.';
+        ? '這個字已有修正錄音，你也可以重新錄製。'
+        : '輸入正確單字，先聽正確發音，再錄一次。';
       correctionPreview.classList.add('hidden');
       correctionPreview.removeAttribute('src');
       correctionEditor.classList.remove('hidden');
@@ -607,16 +671,16 @@
     function speakIntendedWord() {
       const word = intendedWord.value.trim();
       if (!word) {
-        correctionStatus.textContent = 'Enter the correct word first.';
+        correctionStatus.textContent = '請先輸入正確單字。';
         intendedWord.focus();
         return;
       }
       if (/\s/.test(word)) {
-        correctionStatus.textContent = 'Please enter one word only.';
+        correctionStatus.textContent = '一次只能輸入一個單字。';
         return;
       }
       if (!('speechSynthesis' in window)) {
-        correctionStatus.textContent = 'Text-to-speech is not supported in this browser.';
+        correctionStatus.textContent = '此瀏覽器不支援文字轉語音。';
         return;
       }
       speechSynthesis.cancel();
@@ -626,14 +690,14 @@
       speechSynthesis.speak(utterance);
     }
 
-    async function startCorrectionRecording() {
+    async function start修正Recording() {
       const word = intendedWord.value.trim();
       if (!word || /\s/.test(word)) {
-        correctionStatus.textContent = 'Enter one correct word before recording.';
+        correctionStatus.textContent = '錄音前請先輸入一個正確單字。';
         intendedWord.focus();
         return;
       }
-      if (selectedCorrectionIndex === null) return;
+      if (selected修正Index === null) return;
       try {
         correctionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         correctionChunks = [];
@@ -647,7 +711,7 @@
           const type = correctionRecorder.mimeType || 'audio/webm';
           const blob = new Blob(correctionChunks, { type });
           if (correctionStream) correctionStream.getTracks().forEach(t => t.stop());
-          const tokenIndex = selectedCorrectionIndex;
+          const tokenIndex = selected修正Index;
           const existingIndex = corrections.findIndex(c => c.tokenIndex === tokenIndex);
           const item = {
             tokenIndex,
@@ -660,44 +724,44 @@
           else corrections.push(item);
           correctionPreview.src = URL.createObjectURL(blob);
           correctionPreview.classList.remove('hidden');
-          correctionStatus.textContent = `Saved correction: ${item.intendedWord}`;
+          correctionStatus.textContent = `已儲存修正：${item.intendedWord}`;
           renderWordEditor();
-          renderCorrectionsList();
+          render修正sList();
         };
         correctionRecorder.start(200);
         recordWordBtn.classList.add('hidden');
         stopWordBtn.classList.remove('hidden');
         listenWordBtn.disabled = true;
-        cancelCorrectionBtn.disabled = true;
-        correctionStatus.textContent = `Recording “${word}”...`;
+        cancel修正Btn.disabled = true;
+        correctionStatus.textContent = `正在錄製「${word}」…`;
       } catch (err) {
         console.error(err);
-        correctionStatus.textContent = 'Microphone access failed. Please allow microphone permission.';
+        correctionStatus.textContent = '無法使用麥克風。請允許麥克風權限。';
       }
     }
 
-    function stopCorrectionRecording() {
+    function stop修正Recording() {
       if (correctionRecorder && correctionRecorder.state !== 'inactive') correctionRecorder.stop();
       recordWordBtn.classList.remove('hidden');
       stopWordBtn.classList.add('hidden');
       listenWordBtn.disabled = false;
-      cancelCorrectionBtn.disabled = false;
+      cancel修正Btn.disabled = false;
     }
 
-    function closeCorrectionEditor() {
+    function close修正Editor() {
       if (correctionRecorder && correctionRecorder.state !== 'inactive') return;
       correctionEditor.classList.add('hidden');
-      selectedCorrectionIndex = null;
+      selected修正Index = null;
     }
 
-    function removeCorrection(tokenIndex) {
+    function remove修正(tokenIndex) {
       corrections = corrections.filter(c => c.tokenIndex !== tokenIndex);
       renderWordEditor();
-      renderCorrectionsList();
-      if (selectedCorrectionIndex === tokenIndex) closeCorrectionEditor();
+      render修正sList();
+      if (selected修正Index === tokenIndex) close修正Editor();
     }
 
-    function renderCorrectionsList() {
+    function render修正sList() {
       correctionsCards.innerHTML = '';
       const saved = corrections.filter(c => c.audioBlob);
       if (!saved.length) {
@@ -713,15 +777,15 @@
         title.textContent = `${idx + 1}. ${c.intendedWord}`;
         const meta = document.createElement('div');
         meta.className = 'correction-meta';
-        meta.textContent = `AI heard: ${c.aiHeard}`;
+        meta.textContent = `AI 聽成：${c.aiHeard}`;
         const audio = document.createElement('audio');
         audio.controls = true;
         audio.src = URL.createObjectURL(c.audioBlob);
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'secondary';
-        remove.textContent = 'Remove';
-        remove.addEventListener('click', () => removeCorrection(c.tokenIndex));
+        remove.textContent = '刪除';
+        remove.addEventListener('click', () => remove修正(c.tokenIndex));
         card.append(title, meta, audio, remove);
         correctionsCards.appendChild(card);
       });
@@ -821,24 +885,24 @@
       const studentName = $('studentId').value.trim();
       const taskName = $('taskName').value.trim();
       if (!studentName || !taskName) {
-        setStatus('Student Name and Task are required.', 'error');
+        setStatus('學生姓名與作業名稱為必填。', 'error');
         if (!studentName) $('studentId').focus();
         else $('taskName').focus();
         return;
       }
 
       if (!audioBlob) {
-        setStatus('Please make a recording first.', 'error');
+        setStatus('請先完成錄音。', 'error');
         return;
       }
       if (!checkConfig()) {
-        setStatus('Supabase is not connected yet. Add your Supabase URL and anon key in index.html first.', 'error');
+        setStatus('Supabase 尚未連線，請先在 index.html 設定 Supabase URL 與 anon key。', 'error');
         return;
       }
 
       shareBtn.disabled = true;
-      shareBtn.textContent = 'Uploading...';
-      setStatus('Uploading your recording...', '');
+      shareBtn.textContent = '上傳中…';
+      setStatus('正在上傳錄音…', '');
 
       try {
         const id = randomId();
@@ -846,13 +910,13 @@
         const audioPath = `${id}.${ext}`;
         const metaPath = `${id}.json`;
 
-        const savedCorrections = corrections.filter(c => c.audioBlob);
+        const saved修正s = corrections.filter(c => c.audioBlob);
         const correctionMeta = [];
 
         await uploadToSupabase(audioPath, audioBlob, audioBlob.type || 'audio/webm');
 
-        for (let i = 0; i < savedCorrections.length; i++) {
-          const c = savedCorrections[i];
+        for (let i = 0; i < saved修正s.length; i++) {
+          const c = saved修正s[i];
           const cExt = extensionFromMime(c.mimeType || 'audio/webm');
           const correctionPath = `${id}_correction_${String(i + 1).padStart(2, '0')}.${cExt}`;
           await uploadToSupabase(correctionPath, c.audioBlob, c.mimeType || 'audio/webm');
@@ -884,13 +948,13 @@
         const shareUrl = `${base}?id=${encodeURIComponent(id)}`;
         shareUrlBox.value = shareUrl;
         sharePanel.classList.remove('hidden');
-        setStatus('Your sharing link is ready.', 'ok');
+        setStatus('你的分享網址 is ready.', 'ok');
       } catch (err) {
         console.error(err);
-        setStatus(`Upload failed: ${err.message}`, 'error');
+        setStatus(`上傳失敗：${err.message}`, 'error');
       } finally {
         shareBtn.disabled = false;
-        shareBtn.textContent = '🔗 Get Sharing Link';
+        shareBtn.textContent = '🔗 取得分享網址';
       }
     }
 
@@ -899,8 +963,8 @@
       if (!value) return;
       try {
         await navigator.clipboard.writeText(value);
-        copyBtn.textContent = 'Copied!';
-        setTimeout(() => copyBtn.textContent = 'Copy Link', 1400);
+        copyBtn.textContent = '已複製！';
+        setTimeout(() => copyBtn.textContent = '複製網址', 1400);
       } catch (e) {
         shareUrlBox.select();
         document.execCommand('copy');
@@ -914,7 +978,7 @@
       const viewerContent = $('viewerContent');
 
       if (!checkConfig()) {
-        viewerStatus.textContent = 'This site is not connected to Supabase yet.';
+        viewerStatus.textContent = '此網站尚未連接 Supabase。';
         viewerStatus.className = 'status error';
         return;
       }
@@ -929,45 +993,47 @@
         $('viewerStudentId').textContent = meta.studentId || '—';
         $('viewerTaskName').textContent = meta.taskName || '—';
         const oldTranscript = meta.transcript || '';
-        $('viewerAiTranscript').textContent = meta.aiTranscript || oldTranscript || '(No transcript available)';
+        $('viewerAiTranscript').textContent = meta.aiTranscript || oldTranscript || '（無辨識文字）';
         $('viewerAudio').src = publicObjectUrl(meta.audioPath, meta.bucketName || ACTIVE_BUCKET);
 
-        const viewerCorrections = $('viewerCorrections');
-        viewerCorrections.innerHTML = '';
+        const viewer修正s = $('viewer修正s');
+        viewer修正s.innerHTML = '';
         const correctionItems = Array.isArray(meta.corrections) ? meta.corrections : [];
         if (!correctionItems.length) {
-          viewerCorrections.innerHTML = '<div class="transcript-box">No pronunciation corrections submitted.</div>';
+          viewer修正s.innerHTML = '<div class="transcript-box">No pronunciation corrections submitted.</div>';
         } else {
           correctionItems.forEach((c, idx) => {
             const card = document.createElement('div');
             card.className = 'correction-card';
             const title = document.createElement('div');
             title.className = 'correction-title';
-            title.textContent = `${idx + 1}. ${c.intendedWord || 'Correction'}`;
+            title.textContent = `${idx + 1}. ${c.intendedWord || '修正'}`;
             const metaLine = document.createElement('div');
             metaLine.className = 'correction-meta';
-            metaLine.textContent = `AI heard: ${c.aiHeard || '—'}`;
+            metaLine.textContent = `AI 聽成：${c.aiHeard || '—'}`;
             const audio = document.createElement('audio');
             audio.controls = true;
             audio.src = publicObjectUrl(c.audioPath, meta.bucketName || ACTIVE_BUCKET);
             card.append(title, metaLine, audio);
-            viewerCorrections.appendChild(card);
+            viewer修正s.appendChild(card);
           });
         }
 
         $('viewerDate').textContent = meta.createdAt
-          ? `Recorded: ${new Date(meta.createdAt).toLocaleString()}`
+          ? `錄音時間：${new Date(meta.createdAt).toLocaleString()}`
           : '';
 
-        viewerStatus.textContent = 'Recording loaded.';
+        viewerStatus.textContent = '錄音已載入。';
         viewerStatus.className = 'status ok';
         viewerContent.classList.remove('hidden');
       } catch (err) {
         console.error(err);
-        viewerStatus.textContent = 'This recording could not be found or has been removed.';
+        viewerStatus.textContent = '找不到這份錄音，或錄音已被移除。';
         viewerStatus.className = 'status error';
       }
     }
+
+    intendedWord.addEventListener('input', () => updateMeaningDisplay(intendedWord.value));
 
     recordBtn.addEventListener('click', startRecording);
     stopBtn.addEventListener('click', stopRecording);
@@ -975,9 +1041,9 @@
     shareBtn.addEventListener('click', createShareLink);
     copyBtn.addEventListener('click', copyShareLink);
     listenWordBtn.addEventListener('click', speakIntendedWord);
-    recordWordBtn.addEventListener('click', startCorrectionRecording);
-    stopWordBtn.addEventListener('click', stopCorrectionRecording);
-    cancelCorrectionBtn.addEventListener('click', closeCorrectionEditor);
+    recordWordBtn.addEventListener('click', start修正Recording);
+    stopWordBtn.addEventListener('click', stop修正Recording);
+    cancel修正Btn.addEventListener('click', close修正Editor);
 
     const params = new URLSearchParams(location.search);
     const sharedId = params.get('id');
