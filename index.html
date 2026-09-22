@@ -39,6 +39,7 @@
     h2 { margin: 0 0 10px; font-size: 22px; }
     p { margin: 8px 0; }
     .muted { color: var(--muted); }
+    .required { color: #b42318; font-weight: 700; }
     .steps {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -204,13 +205,13 @@
         </div>
 
         <div class="field">
-          <label for="studentId">Seat No. / Student ID <span class="muted">(optional)</span></label>
-          <input id="studentId" type="text" maxlength="30" placeholder="e.g. 12" />
+          <label for="studentId">Student Name <span class="required">(required)</span></label>
+          <input id="studentId" type="text" maxlength="30" placeholder="e.g. 王小明" required />
         </div>
 
         <div class="field">
-          <label for="taskName">Task <span class="muted">(optional)</span></label>
-          <input id="taskName" type="text" maxlength="80" placeholder="e.g. Small Talk 1" />
+          <label for="taskName">Task <span class="required">(required)</span></label>
+          <input id="taskName" type="text" maxlength="80" placeholder="e.g. 高頻U1 11-20" required />
         </div>
 
         <div class="row">
@@ -251,7 +252,7 @@
           </div>
         </section>
 
-        <p class="footer-note">Privacy tip: use seat numbers instead of full names.</p>
+        <p class="footer-note">Please enter your real name and the assigned task name before recording.</p>
       </div>
 
       <div id="viewerView" class="hidden">
@@ -262,7 +263,7 @@
         <div id="viewerContent" class="hidden">
           <div class="viewer-meta">
             <div class="meta-item">
-              <div class="meta-label">Seat No. / Student ID</div>
+              <div class="meta-label">Student Name</div>
               <div id="viewerStudentId" class="meta-value">—</div>
             </div>
             <div class="meta-item">
@@ -393,6 +394,15 @@
     }
 
     async function startRecording() {
+      const studentName = $('studentId').value.trim();
+      const taskName = $('taskName').value.trim();
+      if (!studentName || !taskName) {
+        setStatus('Please enter your real name and task before recording.', 'error');
+        if (!studentName) $('studentId').focus();
+        else $('taskName').focus();
+        return;
+      }
+
       sharePanel.classList.add('hidden');
       resultPanel.classList.add('hidden');
       finalTranscript = '';
@@ -556,6 +566,15 @@
     }
 
     async function createShareLink() {
+      const studentName = $('studentId').value.trim();
+      const taskName = $('taskName').value.trim();
+      if (!studentName || !taskName) {
+        setStatus('Student Name and Task are required.', 'error');
+        if (!studentName) $('studentId').focus();
+        else $('taskName').focus();
+        return;
+      }
+
       if (!audioBlob) {
         setStatus('Please make a recording first.', 'error');
         return;
