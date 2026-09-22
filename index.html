@@ -105,6 +105,44 @@
       padding: 16px;
       min-height: 80px;
     }
+    .word-editor {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      background: var(--soft);
+      border-radius: 14px;
+      padding: 16px;
+      min-height: 80px;
+      align-items: flex-start;
+    }
+    .word-chip {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 9px;
+      padding: 5px 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .word-chip.changed {
+      border-style: dashed;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 10px;
+    }
+    .compare-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    @media (max-width: 640px) {
+      .compare-grid { grid-template-columns: 1fr; }
+    }
     .share-box {
       display: flex;
       gap: 8px;
@@ -186,8 +224,17 @@
           <audio id="audioPlayer" controls></audio>
 
           <h2>Your transcript</h2>
-          <p class="muted">Did the computer understand what you said? You can edit obvious punctuation or spelling before sharing.</p>
-          <textarea id="transcript" placeholder="Your transcript will appear here..."></textarea>
+          <p class="muted">If one word is wrong, click only that word and correct it. Your original AI transcript will be kept.</p>
+
+          <div class="field">
+            <div class="compare-label">AI transcript (original)</div>
+            <div id="aiTranscript" class="transcript-box">Your transcript will appear here...</div>
+          </div>
+
+          <div class="field">
+            <div class="compare-label">Your corrected transcript — click a word to edit</div>
+            <div id="wordEditor" class="word-editor"></div>
+          </div>
 
           <div class="row" style="margin-top:14px;">
             <button id="recordAgainBtn" class="secondary">↻ Record Again</button>
@@ -228,7 +275,16 @@
           <audio id="viewerAudio" controls></audio>
 
           <h2>Transcript</h2>
-          <div id="viewerTranscript" class="transcript-box"></div>
+          <div class="compare-grid">
+            <div>
+              <div class="compare-label">AI transcript (original)</div>
+              <div id="viewerAiTranscript" class="transcript-box"></div>
+            </div>
+            <div>
+              <div class="compare-label">Student correction</div>
+              <div id="viewerCorrectedTranscript" class="transcript-box"></div>
+            </div>
+          </div>
 
           <p id="viewerDate" class="footer-note"></p>
         </div>
@@ -256,6 +312,8 @@
     let finalTranscript = '';
     let interimTranscript = '';
     let isRecording = false;
+    let aiTranscriptText = '';
+    let correctedWords = [];
 
     const $ = (id) => document.getElementById(id);
 
@@ -267,7 +325,8 @@
     const resultPanel = $('resultPanel');
     const sharePanel = $('sharePanel');
     const audioPlayer = $('audioPlayer');
-    const transcriptBox = $('transcript');
+    const aiTranscriptBox = $('aiTranscript');
+    const wordEditor = $('wordEditor');
     const shareBtn = $('shareBtn');
     const recordAgainBtn = $('recordAgainBtn');
     const copyBtn = $('copyBtn');
@@ -317,7 +376,9 @@
             interimTranscript += text;
           }
         }
-        transcriptBox.value = (finalTranscript + interimTranscript).trim();
+        const liveText = (finalTranscript + interimTranscript).trim();
+        aiTranscriptText = liveText;
+        aiTranscriptBox.textContent = liveText || 'Your transcript will appear here...';
       };
 
       recognition.onerror = (event) => {
@@ -336,7 +397,10 @@
       resultPanel.classList.add('hidden');
       finalTranscript = '';
       interimTranscript = '';
-      transcriptBox.value = '';
+      aiTranscriptText = '';
+      correctedWords = [];
+      aiTranscriptBox.textContent = 'Your transcript will appear here...';
+      wordEditor.innerHTML = '';
       audioChunks = [];
       audioBlob = null;
 
@@ -360,6 +424,9 @@
           const type = mediaRecorder.mimeType || 'audio/webm';
           audioBlob = new Blob(audioChunks, { type });
           audioPlayer.src = URL.createObjectURL(audioBlob);
+          aiTranscriptText = (finalTranscript + interimTranscript).trim();
+          aiTranscriptBox.textContent = aiTranscriptText || '(No transcript detected)';
+          buildWordEditor(aiTranscriptText);
           resultPanel.classList.remove('hidden');
           setStatus('Recording finished. Listen and check your transcript.', 'ok');
           if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
@@ -402,11 +469,63 @@
       resultPanel.classList.add('hidden');
       audioPlayer.removeAttribute('src');
       audioPlayer.load();
-      transcriptBox.value = '';
+      aiTranscriptText = '';
+      correctedWords = [];
+      aiTranscriptBox.textContent = 'Your transcript will appear here...';
+      wordEditor.innerHTML = '';
       finalTranscript = '';
       interimTranscript = '';
       audioBlob = null;
       setStatus('Ready. Press Start Recording when you are ready.');
+    }
+
+    function tokenizeTranscript(text) {
+      if (!text.trim()) return [];
+      return text.trim().split(/\s+/).map(token => ({
+        original: token,
+        text: token,
+        changed: false
+      }));
+    }
+
+    function buildWordEditor(text) {
+      correctedWords = tokenizeTranscript(text);
+      renderWordEditor();
+    }
+
+    function renderWordEditor() {
+      wordEditor.innerHTML = '';
+      if (!correctedWords.length) {
+        wordEditor.textContent = '(No transcript detected)';
+        return;
+      }
+      correctedWords.forEach((item, index) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'word-chip' + (item.changed ? ' changed' : '');
+        btn.textContent = item.text;
+        btn.title = item.changed ? `AI heard: ${item.original}` : 'Click to correct this word';
+        btn.addEventListener('click', () => editOneWord(index));
+        wordEditor.appendChild(btn);
+      });
+    }
+
+    function editOneWord(index) {
+      const item = correctedWords[index];
+      const replacement = prompt(`AI heard: ${item.original}\nCorrect this word:`, item.text);
+      if (replacement === null) return;
+      const value = replacement.trim();
+      if (!value || /\s/.test(value)) {
+        alert('Please enter only one word.');
+        return;
+      }
+      item.text = value;
+      item.changed = value !== item.original;
+      renderWordEditor();
+    }
+
+    function getCorrectedTranscript() {
+      return correctedWords.map(w => w.text).join(' ').trim();
     }
 
     function checkConfig() {
@@ -460,7 +579,9 @@
           id,
           studentId: $('studentId').value.trim(),
           taskName: $('taskName').value.trim(),
-          transcript: transcriptBox.value.trim(),
+          aiTranscript: aiTranscriptText.trim(),
+          correctedTranscript: getCorrectedTranscript(),
+          corrections: correctedWords.filter(w => w.changed).map(w => ({ original: w.original, corrected: w.text })),
           audioPath,
           mimeType: audioBlob.type || 'audio/webm',
           createdAt: new Date().toISOString()
@@ -516,7 +637,9 @@
 
         $('viewerStudentId').textContent = meta.studentId || '—';
         $('viewerTaskName').textContent = meta.taskName || '—';
-        $('viewerTranscript').textContent = meta.transcript || '(No transcript available)';
+        const oldTranscript = meta.transcript || '';
+        $('viewerAiTranscript').textContent = meta.aiTranscript || oldTranscript || '(No transcript available)';
+        $('viewerCorrectedTranscript').textContent = meta.correctedTranscript || oldTranscript || '(No corrections submitted)';
         $('viewerAudio').src = publicObjectUrl(meta.audioPath);
         $('viewerDate').textContent = meta.createdAt
           ? `Recorded: ${new Date(meta.createdAt).toLocaleString()}`
