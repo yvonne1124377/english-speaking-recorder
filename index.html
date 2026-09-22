@@ -601,7 +601,10 @@
 
     function isNoSuchBucketError(err) {
       const t = `${err?.message || ''} ${err?.responseText || ''}`;
-      return err?.status === 404 && /NoSuchBucket|Bucket not found/i.test(t);
+      // Supabase Storage may return HTTP 400 while the JSON body contains
+      // statusCode 404 / NoSuchBucket. Detect the actual error text instead
+      // of relying only on the outer HTTP status.
+      return /NoSuchBucket|Bucket not found/i.test(t);
     }
 
     async function uploadToSupabase(path, body, contentType) {
