@@ -298,7 +298,7 @@
      * Replace these three values after you create your project.
      ***********************************************************/
     const SUPABASE_URL = 'https://cufnvllcqoppwydygond.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_yaIZpMakh4r91DApqBcIbQ_wyGjNxX6';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1Zm52bGxjcW9wcHd5ZHlnb25kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwNTM3OTcsImV4cCI6MjEwNTYyOTc5N30.-UywlVdQRrTlRej37m5PWmtsqS_vRDH2oImO_RKgJC4';
     const BUCKET_NAME = 'RECORDING';
 
     /***********************************************************
@@ -552,7 +552,7 @@
     }
 
     function publicObjectUrl(path) {
-      return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${path}`;
+      return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
     }
 
     async function createShareLink() {
@@ -597,7 +597,7 @@
         setStatus('Your sharing link is ready.', 'ok');
       } catch (err) {
         console.error(err);
-        setStatus('Upload failed. Please try again or tell your teacher.', 'error');
+        setStatus(`Upload failed: ${err.message}`, 'error');
       } finally {
         shareBtn.disabled = false;
         shareBtn.textContent = '🔗 Get Sharing Link';
