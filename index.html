@@ -218,7 +218,7 @@
           <button id="recordBtn" class="record-btn">● Start Recording</button>
           <button id="stopBtn" class="record-btn danger hidden">■ Stop</button>
         </div>
-        <div id="status" class="status">Use Chrome for the best transcription support.</div>
+        <div id="status" class="status">For the most reliable transcript, use Chrome on a computer. iPhone browsers may be less consistent.</div>
 
         <section id="resultPanel" class="panel hidden">
           <h2>Listen to your recording</h2>
@@ -315,6 +315,8 @@
     let isRecording = false;
     let aiTranscriptText = '';
     let correctedWords = [];
+    let recognitionEnded = true;
+    let pendingFinalizeTimer = null;
 
     const $ = (id) => document.getElementById(id);
 
@@ -359,6 +361,7 @@
       const SpeechRecognition = getSpeechRecognitionClass();
       if (!SpeechRecognition) {
         recognition = null;
+        recognitionEnded = true;
         return;
       }
 
@@ -387,8 +390,10 @@
       };
 
       recognition.onend = () => {
+        recognitionEnded = true;
         if (isRecording) {
-          try { recognition.start(); } catch (e) {}
+          recognitionEnded = false;
+          try { recognition.start(); } catch (e) { recognitionEnded = true; }
         }
       };
     }
@@ -434,17 +439,18 @@
           const type = mediaRecorder.mimeType || 'audio/webm';
           audioBlob = new Blob(audioChunks, { type });
           audioPlayer.src = URL.createObjectURL(audioBlob);
-          aiTranscriptText = (finalTranscript + interimTranscript).trim();
-          aiTranscriptBox.textContent = aiTranscriptText || '(No transcript detected)';
-          buildWordEditor(aiTranscriptText);
-          resultPanel.classList.remove('hidden');
-          setStatus('Recording finished. Listen and check your transcript.', 'ok');
           if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+
+          // SpeechRecognition often returns its final words a little later than MediaRecorder.
+          // Wait briefly so the original transcript and the editable transcript use the SAME snapshot.
+          if (pendingFinalizeTimer) clearTimeout(pendingFinalizeTimer);
+          pendingFinalizeTimer = setTimeout(finalizeRecordingResult, 900);
         };
 
         setupRecognition();
         if (recognition) {
-          try { recognition.start(); } catch (e) {}
+          recognitionEnded = false;
+          try { recognition.start(); } catch (e) { recognitionEnded = true; }
         }
 
         mediaRecorder.start(250);
@@ -458,6 +464,18 @@
       }
     }
 
+    function finalizeRecordingResult() {
+      aiTranscriptText = (finalTranscript + interimTranscript).trim();
+      aiTranscriptBox.textContent = aiTranscriptText || '(No transcript detected)';
+      buildWordEditor(aiTranscriptText);
+      resultPanel.classList.remove('hidden');
+      if (aiTranscriptText) {
+        setStatus('Recording finished. Listen and check your transcript.', 'ok');
+      } else {
+        setStatus('Recording finished. No transcript was detected. You can record again, preferably in Chrome on a computer.', 'error');
+      }
+    }
+
     function stopRecording() {
       if (!isRecording) return;
       isRecording = false;
@@ -465,6 +483,7 @@
       if (recognition) {
         try { recognition.stop(); } catch (e) {}
       }
+      setStatus('Finishing your recording and transcript...', '');
 
       if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
@@ -485,6 +504,7 @@
       wordEditor.innerHTML = '';
       finalTranscript = '';
       interimTranscript = '';
+      if (pendingFinalizeTimer) { clearTimeout(pendingFinalizeTimer); pendingFinalizeTimer = null; }
       audioBlob = null;
       setStatus('Ready. Press Start Recording when you are ready.');
     }
@@ -544,21 +564,33 @@
 
     async function uploadToSupabase(path, body, contentType) {
       const url = `${SUPABASE_URL}/storage/v1/object/${BUCKET_NAME}/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'apikey': SUPABASE_ANON_KEY,
-          'Content-Type': contentType,
-          'x-upsert': 'false'
-        },
-        body
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Upload failed (${res.status}): ${text}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'apikey': SUPABASE_ANON_KEY,
+            'Content-Type': contentType,
+            'x-upsert': 'false'
+          },
+          body,
+          signal: controller.signal
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`Upload failed (${res.status}): ${text}`);
+        }
+        return res.json().catch(() => ({}));
+      } catch (err) {
+        if (err && err.name === 'AbortError') {
+          throw new Error('Upload timed out after 20 seconds. Please check your connection and try again.');
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
       }
-      return res.json().catch(() => ({}));
     }
 
     function publicObjectUrl(path) {
@@ -593,6 +625,9 @@
         const ext = extensionFromMime(audioBlob.type || 'audio/webm');
         const audioPath = `${id}.${ext}`;
         const metaPath = `${id}.json`;
+
+        // Use the latest finalized transcript snapshot before uploading.
+        if (!correctedWords.length && aiTranscriptText.trim()) buildWordEditor(aiTranscriptText);
 
         const meta = {
           id,
