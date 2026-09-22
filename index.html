@@ -254,16 +254,19 @@
           <audio id="audioPlayer" controls></audio>
 
           <h2>AI 辨識文字</h2>
-          <p class="muted">點選單字可查看老師提供的中文意思；如果 AI 把某個字聽錯了，再聽正確發音並單獨重錄該字。</p>
+          <p class="muted">點選單字後，可視需要按「查看中文意思」；如果 AI 把某個字聽錯了，再聽正確發音並單獨重錄該字。</p>
 
           <div class="field">
-            <div class="compare-label">AI 辨識結果 — 點單字可查看中文意思／進行發音修正</div>
+            <div class="compare-label">AI 辨識結果 — 點單字查看選項／進行發音修正</div>
             <div id="wordEditor" class="word-editor"></div>
           </div>
 
           <div id="correctionEditor" class="correction-editor hidden">
             <div class="correction-title">發音修正</div>
             <div class="correction-meta">AI 聽成：<strong id="heardWord">—</strong></div>
+            <div id="meaningAction" class="row hidden" style="margin:8px 0 4px;">
+              <button id="showMeaningBtn" type="button" class="secondary">查看中文意思</button>
+            </div>
             <div id="wordMeaningBox" class="meaning-box hidden">
               <div class="meaning-label">中文意思</div>
               <div id="wordMeaning" class="meaning-value"></div>
@@ -408,6 +411,8 @@
     const heardWord = $('heardWord');
     const wordMeaningBox = $('wordMeaningBox');
     const wordMeaning = $('wordMeaning');
+    const meaningAction = $('meaningAction');
+    const showMeaningBtn = $('showMeaningBtn');
     const intendedWord = $('intendedWord');
     const listenWordBtn = $('listenWordBtn');
     const recordWordBtn = $('recordWordBtn');
@@ -643,12 +648,14 @@
 
     function updateMeaningDisplay(word) {
       const meaning = getChineseMeaning(word);
+      wordMeaningBox.classList.add('hidden');
+      showMeaningBtn.textContent = '查看中文意思';
       if (meaning) {
         wordMeaning.textContent = meaning;
-        wordMeaningBox.classList.remove('hidden');
+        meaningAction.classList.remove('hidden');
       } else {
         wordMeaning.textContent = '';
-        wordMeaningBox.classList.add('hidden');
+        meaningAction.classList.add('hidden');
       }
     }
 
@@ -1032,6 +1039,17 @@
         viewerStatus.className = 'status error';
       }
     }
+
+    showMeaningBtn.addEventListener('click', () => {
+      const isHidden = wordMeaningBox.classList.contains('hidden');
+      if (isHidden) {
+        wordMeaningBox.classList.remove('hidden');
+        showMeaningBtn.textContent = '隱藏中文意思';
+      } else {
+        wordMeaningBox.classList.add('hidden');
+        showMeaningBtn.textContent = '查看中文意思';
+      }
+    });
 
     intendedWord.addEventListener('input', () => updateMeaningDisplay(intendedWord.value));
 
