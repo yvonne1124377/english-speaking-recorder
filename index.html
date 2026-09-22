@@ -121,29 +121,42 @@
       background: #fff;
       color: var(--text);
       border-radius: 9px;
-      padding: 5px 8px;
+      padding: 6px 9px;
       font-weight: 600;
       cursor: pointer;
     }
-    .word-chip.changed {
-      border-style: dashed;
-      text-decoration: underline;
-      text-underline-offset: 3px;
+    .word-chip.corrected {
+      border: 2px solid var(--ok);
+      position: relative;
     }
-    .compare-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 10px;
+    .word-chip.corrected::after {
+      content: '✓';
+      margin-left: 5px;
+      color: var(--ok);
+      font-weight: 800;
     }
     .compare-label {
       font-size: 12px;
       color: var(--muted);
       margin-bottom: 6px;
     }
-    @media (max-width: 640px) {
-      .compare-grid { grid-template-columns: 1fr; }
+    .correction-card {
+      background: var(--soft);
+      border-radius: 14px;
+      padding: 16px;
+      margin-top: 12px;
     }
+    .correction-title { font-weight: 800; margin-bottom: 8px; }
+    .correction-meta { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
+    .correction-editor {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      margin-top: 16px;
+      background: #fff;
+    }
+    .correction-editor .field { margin: 12px 0; }
+    .mini-status { font-size: 13px; color: var(--muted); margin-top: 8px; }
     .share-box {
       display: flex;
       gap: 8px;
@@ -225,16 +238,33 @@
           <audio id="audioPlayer" controls></audio>
 
           <h2>Your transcript</h2>
-          <p class="muted">If one word is wrong, click only that word and correct it. Your original AI transcript will be kept.</p>
+          <p class="muted">If AI heard a word incorrectly, tap that word. Listen to the correct pronunciation, then record that word again.</p>
 
           <div class="field">
-            <div class="compare-label">AI transcript (original)</div>
-            <div id="aiTranscript" class="transcript-box">Your transcript will appear here...</div>
+            <div class="compare-label">AI transcript — tap a wrong word</div>
+            <div id="wordEditor" class="word-editor"></div>
           </div>
 
-          <div class="field">
-            <div class="compare-label">Your corrected transcript — click a word to edit</div>
-            <div id="wordEditor" class="word-editor"></div>
+          <div id="correctionEditor" class="correction-editor hidden">
+            <div class="correction-title">Pronunciation correction</div>
+            <div class="correction-meta">AI heard: <strong id="heardWord">—</strong></div>
+            <div class="field">
+              <label for="intendedWord">What word did you mean?</label>
+              <input id="intendedWord" type="text" maxlength="40" placeholder="e.g. thought" />
+            </div>
+            <div class="row">
+              <button id="listenWordBtn" type="button" class="secondary">🔊 Listen</button>
+              <button id="recordWordBtn" type="button">🎙️ Record this word</button>
+              <button id="stopWordBtn" type="button" class="danger hidden">■ Stop</button>
+              <button id="cancelCorrectionBtn" type="button" class="secondary">Cancel</button>
+            </div>
+            <div id="correctionStatus" class="mini-status">Enter the correct word, listen, then record it once.</div>
+            <audio id="correctionPreview" controls class="hidden"></audio>
+          </div>
+
+          <div id="correctionsList" class="field hidden">
+            <div class="compare-label">Your pronunciation corrections</div>
+            <div id="correctionsCards"></div>
           </div>
 
           <div class="row" style="margin-top:14px;">
@@ -275,17 +305,11 @@
           <h2>Recording</h2>
           <audio id="viewerAudio" controls></audio>
 
-          <h2>Transcript</h2>
-          <div class="compare-grid">
-            <div>
-              <div class="compare-label">AI transcript (original)</div>
-              <div id="viewerAiTranscript" class="transcript-box"></div>
-            </div>
-            <div>
-              <div class="compare-label">Student correction</div>
-              <div id="viewerCorrectedTranscript" class="transcript-box"></div>
-            </div>
-          </div>
+          <h2>AI Transcript</h2>
+          <div id="viewerAiTranscript" class="transcript-box"></div>
+
+          <h2 style="margin-top:22px;">Pronunciation Corrections</h2>
+          <div id="viewerCorrections"></div>
 
           <p id="viewerDate" class="footer-note"></p>
         </div>
@@ -315,7 +339,12 @@
     let interimTranscript = '';
     let isRecording = false;
     let aiTranscriptText = '';
-    let correctedWords = [];
+    let transcriptTokens = [];
+    let corrections = [];
+    let selectedCorrectionIndex = null;
+    let correctionRecorder = null;
+    let correctionStream = null;
+    let correctionChunks = [];
     let recognitionEnded = true;
     let pendingFinalizeTimer = null;
 
@@ -329,8 +358,18 @@
     const resultPanel = $('resultPanel');
     const sharePanel = $('sharePanel');
     const audioPlayer = $('audioPlayer');
-    const aiTranscriptBox = $('aiTranscript');
     const wordEditor = $('wordEditor');
+    const correctionEditor = $('correctionEditor');
+    const heardWord = $('heardWord');
+    const intendedWord = $('intendedWord');
+    const listenWordBtn = $('listenWordBtn');
+    const recordWordBtn = $('recordWordBtn');
+    const stopWordBtn = $('stopWordBtn');
+    const cancelCorrectionBtn = $('cancelCorrectionBtn');
+    const correctionStatus = $('correctionStatus');
+    const correctionPreview = $('correctionPreview');
+    const correctionsList = $('correctionsList');
+    const correctionsCards = $('correctionsCards');
     const shareBtn = $('shareBtn');
     const recordAgainBtn = $('recordAgainBtn');
     const copyBtn = $('copyBtn');
@@ -383,7 +422,6 @@
         }
         const liveText = (finalTranscript + interimTranscript).trim();
         aiTranscriptText = liveText;
-        aiTranscriptBox.textContent = liveText || 'Your transcript will appear here...';
       };
 
       recognition.onerror = (event) => {
@@ -414,9 +452,13 @@
       finalTranscript = '';
       interimTranscript = '';
       aiTranscriptText = '';
-      correctedWords = [];
-      aiTranscriptBox.textContent = 'Your transcript will appear here...';
+      transcriptTokens = [];
+      corrections = [];
+      selectedCorrectionIndex = null;
       wordEditor.innerHTML = '';
+      correctionEditor.classList.add('hidden');
+      correctionsList.classList.add('hidden');
+      correctionsCards.innerHTML = '';
       audioChunks = [];
       audioBlob = null;
 
@@ -467,7 +509,6 @@
 
     function finalizeRecordingResult() {
       aiTranscriptText = (finalTranscript + interimTranscript).trim();
-      aiTranscriptBox.textContent = aiTranscriptText || '(No transcript detected)';
       buildWordEditor(aiTranscriptText);
       resultPanel.classList.remove('hidden');
       if (aiTranscriptText) {
@@ -500,9 +541,13 @@
       audioPlayer.removeAttribute('src');
       audioPlayer.load();
       aiTranscriptText = '';
-      correctedWords = [];
-      aiTranscriptBox.textContent = 'Your transcript will appear here...';
+      transcriptTokens = [];
+      corrections = [];
+      selectedCorrectionIndex = null;
       wordEditor.innerHTML = '';
+      correctionEditor.classList.add('hidden');
+      correctionsList.classList.add('hidden');
+      correctionsCards.innerHTML = '';
       finalTranscript = '';
       interimTranscript = '';
       if (pendingFinalizeTimer) { clearTimeout(pendingFinalizeTimer); pendingFinalizeTimer = null; }
@@ -514,51 +559,172 @@
 
     function tokenizeTranscript(text) {
       if (!text.trim()) return [];
-      return text.trim().split(/\s+/).map(token => ({
-        original: token,
-        text: token,
-        changed: false
-      }));
+      return text.trim().split(/\s+/).map((token, index) => ({ token, index }));
     }
 
     function buildWordEditor(text) {
-      correctedWords = tokenizeTranscript(text);
+      transcriptTokens = tokenizeTranscript(text);
       renderWordEditor();
     }
 
     function renderWordEditor() {
       wordEditor.innerHTML = '';
-      if (!correctedWords.length) {
+      if (!transcriptTokens.length) {
         wordEditor.textContent = '(No transcript detected)';
         return;
       }
-      correctedWords.forEach((item, index) => {
+      transcriptTokens.forEach((item) => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'word-chip' + (item.changed ? ' changed' : '');
-        btn.textContent = item.text;
-        btn.title = item.changed ? `AI heard: ${item.original}` : 'Click to correct this word';
-        btn.addEventListener('click', () => editOneWord(index));
+        const hasCorrection = corrections.some(c => c.tokenIndex === item.index && c.audioBlob);
+        btn.className = 'word-chip' + (hasCorrection ? ' corrected' : '');
+        btn.textContent = item.token;
+        btn.title = hasCorrection ? 'Correction recorded' : 'Tap if AI heard this word incorrectly';
+        btn.addEventListener('click', () => openCorrectionEditor(item.index));
         wordEditor.appendChild(btn);
       });
     }
 
-    function editOneWord(index) {
-      const item = correctedWords[index];
-      const replacement = prompt(`AI heard: ${item.original}\nCorrect this word:`, item.text);
-      if (replacement === null) return;
-      const value = replacement.trim();
-      if (!value || /\s/.test(value)) {
-        alert('Please enter only one word.');
-        return;
-      }
-      item.text = value;
-      item.changed = value !== item.original;
-      renderWordEditor();
+    function cleanWordForSpeech(word) {
+      return word.replace(/^[^A-Za-z'-]+|[^A-Za-z'-]+$/g, '');
     }
 
-    function getCorrectedTranscript() {
-      return correctedWords.map(w => w.text).join(' ').trim();
+    function openCorrectionEditor(tokenIndex) {
+      selectedCorrectionIndex = tokenIndex;
+      const token = transcriptTokens[tokenIndex]?.token || '';
+      const existing = corrections.find(c => c.tokenIndex === tokenIndex);
+      heardWord.textContent = token;
+      intendedWord.value = existing?.intendedWord || cleanWordForSpeech(token);
+      correctionStatus.textContent = existing?.audioBlob
+        ? 'A correction recording is already saved for this word. You can record it again.'
+        : 'Enter the correct word, listen, then record it once.';
+      correctionPreview.classList.add('hidden');
+      correctionPreview.removeAttribute('src');
+      correctionEditor.classList.remove('hidden');
+      correctionEditor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function speakIntendedWord() {
+      const word = intendedWord.value.trim();
+      if (!word) {
+        correctionStatus.textContent = 'Enter the correct word first.';
+        intendedWord.focus();
+        return;
+      }
+      if (/\s/.test(word)) {
+        correctionStatus.textContent = 'Please enter one word only.';
+        return;
+      }
+      if (!('speechSynthesis' in window)) {
+        correctionStatus.textContent = 'Text-to-speech is not supported in this browser.';
+        return;
+      }
+      speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(word);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.85;
+      speechSynthesis.speak(utterance);
+    }
+
+    async function startCorrectionRecording() {
+      const word = intendedWord.value.trim();
+      if (!word || /\s/.test(word)) {
+        correctionStatus.textContent = 'Enter one correct word before recording.';
+        intendedWord.focus();
+        return;
+      }
+      if (selectedCorrectionIndex === null) return;
+      try {
+        correctionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        correctionChunks = [];
+        const preferredTypes = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'];
+        const mimeType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t)) || '';
+        correctionRecorder = new MediaRecorder(correctionStream, mimeType ? { mimeType } : undefined);
+        correctionRecorder.ondataavailable = e => {
+          if (e.data && e.data.size > 0) correctionChunks.push(e.data);
+        };
+        correctionRecorder.onstop = () => {
+          const type = correctionRecorder.mimeType || 'audio/webm';
+          const blob = new Blob(correctionChunks, { type });
+          if (correctionStream) correctionStream.getTracks().forEach(t => t.stop());
+          const tokenIndex = selectedCorrectionIndex;
+          const existingIndex = corrections.findIndex(c => c.tokenIndex === tokenIndex);
+          const item = {
+            tokenIndex,
+            aiHeard: transcriptTokens[tokenIndex]?.token || '',
+            intendedWord: intendedWord.value.trim(),
+            audioBlob: blob,
+            mimeType: blob.type || 'audio/webm'
+          };
+          if (existingIndex >= 0) corrections[existingIndex] = item;
+          else corrections.push(item);
+          correctionPreview.src = URL.createObjectURL(blob);
+          correctionPreview.classList.remove('hidden');
+          correctionStatus.textContent = `Saved correction: ${item.intendedWord}`;
+          renderWordEditor();
+          renderCorrectionsList();
+        };
+        correctionRecorder.start(200);
+        recordWordBtn.classList.add('hidden');
+        stopWordBtn.classList.remove('hidden');
+        listenWordBtn.disabled = true;
+        cancelCorrectionBtn.disabled = true;
+        correctionStatus.textContent = `Recording “${word}”...`;
+      } catch (err) {
+        console.error(err);
+        correctionStatus.textContent = 'Microphone access failed. Please allow microphone permission.';
+      }
+    }
+
+    function stopCorrectionRecording() {
+      if (correctionRecorder && correctionRecorder.state !== 'inactive') correctionRecorder.stop();
+      recordWordBtn.classList.remove('hidden');
+      stopWordBtn.classList.add('hidden');
+      listenWordBtn.disabled = false;
+      cancelCorrectionBtn.disabled = false;
+    }
+
+    function closeCorrectionEditor() {
+      if (correctionRecorder && correctionRecorder.state !== 'inactive') return;
+      correctionEditor.classList.add('hidden');
+      selectedCorrectionIndex = null;
+    }
+
+    function removeCorrection(tokenIndex) {
+      corrections = corrections.filter(c => c.tokenIndex !== tokenIndex);
+      renderWordEditor();
+      renderCorrectionsList();
+      if (selectedCorrectionIndex === tokenIndex) closeCorrectionEditor();
+    }
+
+    function renderCorrectionsList() {
+      correctionsCards.innerHTML = '';
+      const saved = corrections.filter(c => c.audioBlob);
+      if (!saved.length) {
+        correctionsList.classList.add('hidden');
+        return;
+      }
+      correctionsList.classList.remove('hidden');
+      saved.sort((a,b) => a.tokenIndex - b.tokenIndex).forEach((c, idx) => {
+        const card = document.createElement('div');
+        card.className = 'correction-card';
+        const title = document.createElement('div');
+        title.className = 'correction-title';
+        title.textContent = `${idx + 1}. ${c.intendedWord}`;
+        const meta = document.createElement('div');
+        meta.className = 'correction-meta';
+        meta.textContent = `AI heard: ${c.aiHeard}`;
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.src = URL.createObjectURL(c.audioBlob);
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'secondary';
+        remove.textContent = 'Remove';
+        remove.addEventListener('click', () => removeCorrection(c.tokenIndex));
+        card.append(title, meta, audio, remove);
+        correctionsCards.appendChild(card);
+      });
     }
 
     function checkConfig() {
@@ -680,23 +846,37 @@
         const audioPath = `${id}.${ext}`;
         const metaPath = `${id}.json`;
 
-        // Use the latest finalized transcript snapshot before uploading.
-        if (!correctedWords.length && aiTranscriptText.trim()) buildWordEditor(aiTranscriptText);
+        const savedCorrections = corrections.filter(c => c.audioBlob);
+        const correctionMeta = [];
+
+        await uploadToSupabase(audioPath, audioBlob, audioBlob.type || 'audio/webm');
+
+        for (let i = 0; i < savedCorrections.length; i++) {
+          const c = savedCorrections[i];
+          const cExt = extensionFromMime(c.mimeType || 'audio/webm');
+          const correctionPath = `${id}_correction_${String(i + 1).padStart(2, '0')}.${cExt}`;
+          await uploadToSupabase(correctionPath, c.audioBlob, c.mimeType || 'audio/webm');
+          correctionMeta.push({
+            tokenIndex: c.tokenIndex,
+            aiHeard: c.aiHeard,
+            intendedWord: c.intendedWord,
+            audioPath: correctionPath,
+            mimeType: c.mimeType || 'audio/webm'
+          });
+        }
 
         const meta = {
           id,
           studentId: $('studentId').value.trim(),
           taskName: $('taskName').value.trim(),
           aiTranscript: aiTranscriptText.trim(),
-          correctedTranscript: getCorrectedTranscript(),
-          corrections: correctedWords.filter(w => w.changed).map(w => ({ original: w.original, corrected: w.text })),
+          corrections: correctionMeta,
           audioPath,
           mimeType: audioBlob.type || 'audio/webm',
           createdAt: new Date().toISOString(),
           bucketName: ACTIVE_BUCKET
         };
 
-        await uploadToSupabase(audioPath, audioBlob, meta.mimeType);
         meta.bucketName = ACTIVE_BUCKET;
         await uploadToSupabase(metaPath, new Blob([JSON.stringify(meta)], { type: 'application/json' }), 'application/json');
 
@@ -750,8 +930,31 @@
         $('viewerTaskName').textContent = meta.taskName || '—';
         const oldTranscript = meta.transcript || '';
         $('viewerAiTranscript').textContent = meta.aiTranscript || oldTranscript || '(No transcript available)';
-        $('viewerCorrectedTranscript').textContent = meta.correctedTranscript || oldTranscript || '(No corrections submitted)';
         $('viewerAudio').src = publicObjectUrl(meta.audioPath, meta.bucketName || ACTIVE_BUCKET);
+
+        const viewerCorrections = $('viewerCorrections');
+        viewerCorrections.innerHTML = '';
+        const correctionItems = Array.isArray(meta.corrections) ? meta.corrections : [];
+        if (!correctionItems.length) {
+          viewerCorrections.innerHTML = '<div class="transcript-box">No pronunciation corrections submitted.</div>';
+        } else {
+          correctionItems.forEach((c, idx) => {
+            const card = document.createElement('div');
+            card.className = 'correction-card';
+            const title = document.createElement('div');
+            title.className = 'correction-title';
+            title.textContent = `${idx + 1}. ${c.intendedWord || 'Correction'}`;
+            const metaLine = document.createElement('div');
+            metaLine.className = 'correction-meta';
+            metaLine.textContent = `AI heard: ${c.aiHeard || '—'}`;
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.src = publicObjectUrl(c.audioPath, meta.bucketName || ACTIVE_BUCKET);
+            card.append(title, metaLine, audio);
+            viewerCorrections.appendChild(card);
+          });
+        }
+
         $('viewerDate').textContent = meta.createdAt
           ? `Recorded: ${new Date(meta.createdAt).toLocaleString()}`
           : '';
@@ -771,6 +974,10 @@
     recordAgainBtn.addEventListener('click', resetForNewRecording);
     shareBtn.addEventListener('click', createShareLink);
     copyBtn.addEventListener('click', copyShareLink);
+    listenWordBtn.addEventListener('click', speakIntendedWord);
+    recordWordBtn.addEventListener('click', startCorrectionRecording);
+    stopWordBtn.addEventListener('click', stopCorrectionRecording);
+    cancelCorrectionBtn.addEventListener('click', closeCorrectionEditor);
 
     const params = new URLSearchParams(location.search);
     const sharedId = params.get('id');
