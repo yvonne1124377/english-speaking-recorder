@@ -254,7 +254,7 @@
           <audio id="audioPlayer" controls></audio>
 
           <h2>AI 辨識文字</h2>
-          <p class="muted">點選單字後，可視需要按「查看中文意思」；如果 AI 把某個字聽錯了，再聽正確發音並單獨重錄該字。</p>
+          <p class="muted">點選任何英文單字後，都可以按「查看中文意思」；如果 AI 把某個字聽錯了，再聽正確發音並單獨重錄該字。</p>
 
           <div class="field">
             <div class="compare-label">AI 辨識結果 — 點單字查看選項／進行發音修正</div>
@@ -270,6 +270,7 @@
             <div id="wordMeaningBox" class="meaning-box hidden">
               <div class="meaning-label">中文意思</div>
               <div id="wordMeaning" class="meaning-value"></div>
+              <div class="footer-note">老師自訂詞義優先；其他單字會連線查詢中文翻譯。</div>
             </div>
             <div class="field">
               <label for="intendedWord">你原本要說哪個字？</label>
@@ -641,23 +642,50 @@
       return word.replace(/^[^A-Za-z'-]+|[^A-Za-z'-]+$/g, '');
     }
 
-    function getChineseMeaning(word) {
+    const meaningCache = new Map();
+
+    function getTeacherMeaning(word) {
       const key = cleanWordForSpeech(word || '').toLowerCase();
       return TEACHER_VOCAB[key] || '';
     }
 
-    function updateMeaningDisplay(word) {
-      const meaning = getChineseMeaning(word);
-      wordMeaningBox.classList.add('hidden');
-      showMeaningBtn.textContent = '查看中文意思';
-      if (meaning) {
-        wordMeaning.textContent = meaning;
-        meaningAction.classList.remove('hidden');
-      } else {
-        wordMeaning.textContent = '';
-        meaningAction.classList.add('hidden');
+    async function fetchChineseMeaning(word) {
+      const key = cleanWordForSpeech(word || '').toLowerCase();
+      if (!key) return '';
+
+      // 1) 老師自訂詞義永遠優先
+      if (TEACHER_VOCAB[key]) return TEACHER_VOCAB[key];
+      // 2) 同一裝置查過就不重複呼叫翻譯服務
+      if (meaningCache.has(key)) return meaningCache.get(key);
+
+      try {
+        // MyMemory 公開翻譯 API：免登入，適合單字／短語查詢。
+        const endpoint = 'https://api.mymemory.translated.net/get?q=' +
+          encodeURIComponent(key) + '&langpair=' + encodeURIComponent('en|zh-TW');
+        const res = await fetch(endpoint, { method: 'GET' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        let translated = (data?.responseData?.translatedText || '').trim();
+        if (!translated || translated.toLowerCase() === key) translated = '';
+        meaningCache.set(key, translated);
+        return translated;
+      } catch (err) {
+        console.warn('Meaning lookup failed:', err);
+        meaningCache.set(key, '');
+        return '';
       }
     }
+
+    function updateMeaningDisplay(word) {
+      const key = cleanWordForSpeech(word || '').toLowerCase();
+      wordMeaningBox.classList.add('hidden');
+      wordMeaning.textContent = '';
+      showMeaningBtn.textContent = '查看中文意思';
+      // 任何英文單字都顯示「查看中文意思」；真正查詢在按鈕被點擊時才進行。
+      if (key) meaningAction.classList.remove('hidden');
+      else meaningAction.classList.add('hidden');
+    }
+
 
     function open修正Editor(tokenIndex) {
       selected修正Index = tokenIndex;
@@ -1040,15 +1068,31 @@
       }
     }
 
-    showMeaningBtn.addEventListener('click', () => {
+    showMeaningBtn.addEventListener('click', async () => {
       const isHidden = wordMeaningBox.classList.contains('hidden');
-      if (isHidden) {
-        wordMeaningBox.classList.remove('hidden');
-        showMeaningBtn.textContent = '隱藏中文意思';
-      } else {
+      if (!isHidden) {
         wordMeaningBox.classList.add('hidden');
         showMeaningBtn.textContent = '查看中文意思';
+        return;
       }
+
+      const word = intendedWord.value.trim() || heardWord.textContent.trim();
+      const key = cleanWordForSpeech(word);
+      if (!key) {
+        wordMeaning.textContent = '沒有可查詢的英文單字。';
+        wordMeaningBox.classList.remove('hidden');
+        return;
+      }
+
+      showMeaningBtn.disabled = true;
+      showMeaningBtn.textContent = '查詢中…';
+      wordMeaning.textContent = '正在查詢中文意思…';
+      wordMeaningBox.classList.remove('hidden');
+
+      const meaning = await fetchChineseMeaning(key);
+      wordMeaning.textContent = meaning || '暫時查不到中文意思，請稍後再試。';
+      showMeaningBtn.disabled = false;
+      showMeaningBtn.textContent = '隱藏中文意思';
     });
 
     intendedWord.addEventListener('input', () => updateMeaningDisplay(intendedWord.value));
