@@ -300,7 +300,8 @@
      ***********************************************************/
     const SUPABASE_URL = 'https://cufnvllcqoppwydygond.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1Zm52bGxjcW9wcHd5ZHlnb25kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwNTM3OTcsImV4cCI6MjEwNTYyOTc5N30.-UywlVdQRrTlRej37m5PWmtsqS_vRDH2oImO_RKgJC4';
-    const BUCKET_NAME = 'RECORDING';
+    const BUCKET_CANDIDATES = ['Recording', 'RECORDING', 'recording', 'recordings'];
+    let ACTIVE_BUCKET = null;
 
     /***********************************************************
      * App state
@@ -507,6 +508,8 @@
       if (pendingFinalizeTimer) { clearTimeout(pendingFinalizeTimer); pendingFinalizeTimer = null; }
       audioBlob = null;
       setStatus('Ready. Press Start Recording when you are ready.');
+      shareBtn.disabled = false;
+      shareBtn.textContent = '🔗 Get Sharing Link';
     }
 
     function tokenizeTranscript(text) {
@@ -562,8 +565,8 @@
       return !SUPABASE_URL.includes('PASTE_YOUR') && !SUPABASE_ANON_KEY.includes('PASTE_YOUR');
     }
 
-    async function uploadToSupabase(path, body, contentType) {
-      const url = `${SUPABASE_URL}/storage/v1/object/${BUCKET_NAME}/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
+    async function uploadToBucket(bucket, path, body, contentType) {
+      const url = `${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 20000);
       try {
@@ -578,11 +581,14 @@
           body,
           signal: controller.signal
         });
+        const text = await res.text();
         if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`Upload failed (${res.status}): ${text}`);
+          const err = new Error(`Upload failed (${res.status}): ${text}`);
+          err.status = res.status;
+          err.responseText = text;
+          throw err;
         }
-        return res.json().catch(() => ({}));
+        return text ? JSON.parse(text) : {};
       } catch (err) {
         if (err && err.name === 'AbortError') {
           throw new Error('Upload timed out after 20 seconds. Please check your connection and try again.');
@@ -593,8 +599,53 @@
       }
     }
 
-    function publicObjectUrl(path) {
-      return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
+    function isNoSuchBucketError(err) {
+      const t = `${err?.message || ''} ${err?.responseText || ''}`;
+      return err?.status === 404 && /NoSuchBucket|Bucket not found/i.test(t);
+    }
+
+    async function uploadToSupabase(path, body, contentType) {
+      const candidates = ACTIVE_BUCKET
+        ? [ACTIVE_BUCKET, ...BUCKET_CANDIDATES.filter(b => b !== ACTIVE_BUCKET)]
+        : BUCKET_CANDIDATES;
+
+      let lastErr = null;
+      for (const bucket of candidates) {
+        try {
+          const result = await uploadToBucket(bucket, path, body, contentType);
+          ACTIVE_BUCKET = bucket;
+          return result;
+        } catch (err) {
+          lastErr = err;
+          if (isNoSuchBucketError(err)) continue;
+          if (err?.status === 403 || err?.status === 401) {
+            throw new Error(`Storage policy blocked the upload for bucket “${bucket}”. In Supabase, the INSERT policy must allow anon uploads to this exact bucket name.`);
+          }
+          throw err;
+        }
+      }
+      throw lastErr || new Error('No matching Supabase Storage bucket was found.');
+    }
+
+    function publicObjectUrl(path, bucket = ACTIVE_BUCKET || BUCKET_CANDIDATES[0]) {
+      return `${SUPABASE_URL}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
+    }
+
+    async function fetchPublicObject(path) {
+      const candidates = ACTIVE_BUCKET
+        ? [ACTIVE_BUCKET, ...BUCKET_CANDIDATES.filter(b => b !== ACTIVE_BUCKET)]
+        : BUCKET_CANDIDATES;
+      let lastResponse = null;
+      for (const bucket of candidates) {
+        const res = await fetch(publicObjectUrl(path, bucket), { cache: 'no-store' });
+        lastResponse = res;
+        if (res.ok) {
+          ACTIVE_BUCKET = bucket;
+          return { res, bucket };
+        }
+        if (res.status !== 404) return { res, bucket };
+      }
+      return { res: lastResponse, bucket: null };
     }
 
     async function createShareLink() {
@@ -638,10 +689,12 @@
           corrections: correctedWords.filter(w => w.changed).map(w => ({ original: w.original, corrected: w.text })),
           audioPath,
           mimeType: audioBlob.type || 'audio/webm',
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          bucketName: ACTIVE_BUCKET
         };
 
         await uploadToSupabase(audioPath, audioBlob, meta.mimeType);
+        meta.bucketName = ACTIVE_BUCKET;
         await uploadToSupabase(metaPath, new Blob([JSON.stringify(meta)], { type: 'application/json' }), 'application/json');
 
         const base = `${location.origin}${location.pathname}`;
@@ -684,17 +737,18 @@
       }
 
       try {
-        const metaUrl = publicObjectUrl(`${id}.json`);
-        const res = await fetch(metaUrl, { cache: 'no-store' });
-        if (!res.ok) throw new Error('Recording not found');
+        const fetched = await fetchPublicObject(`${id}.json`);
+        const res = fetched.res;
+        if (!res || !res.ok) throw new Error('Recording not found');
         const meta = await res.json();
+        if (meta.bucketName) ACTIVE_BUCKET = meta.bucketName;
 
         $('viewerStudentId').textContent = meta.studentId || '—';
         $('viewerTaskName').textContent = meta.taskName || '—';
         const oldTranscript = meta.transcript || '';
         $('viewerAiTranscript').textContent = meta.aiTranscript || oldTranscript || '(No transcript available)';
         $('viewerCorrectedTranscript').textContent = meta.correctedTranscript || oldTranscript || '(No corrections submitted)';
-        $('viewerAudio').src = publicObjectUrl(meta.audioPath);
+        $('viewerAudio').src = publicObjectUrl(meta.audioPath, meta.bucketName || ACTIVE_BUCKET);
         $('viewerDate').textContent = meta.createdAt
           ? `Recorded: ${new Date(meta.createdAt).toLocaleString()}`
           : '';
