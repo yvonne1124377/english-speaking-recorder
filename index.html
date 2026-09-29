@@ -1226,11 +1226,13 @@
     }
 
 
-    retryListenBtn.addEventListener('click', () => {
-      if (!audioPlayer.src) return;
-      audioPlayer.currentTime = 0;
-      audioPlayer.play().catch(() => {});
-    });
+    if (retryListenBtn) {
+      retryListenBtn.addEventListener('click', () => {
+        if (!audioPlayer.src) return;
+        audioPlayer.currentTime = 0;
+        audioPlayer.play().catch(() => {});
+      });
+    }
 
     recordBtn.addEventListener('click', startRecording);
     stopBtn.addEventListener('click', stopRecording);
