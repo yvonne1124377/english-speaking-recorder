@@ -419,7 +419,7 @@
       <div id="studentView">
         <span class="badge">免登入即可使用</span>
         <h1>🎙️ 英語口說錄音工具</h1>
-        <p class="muted">錄下你的英文，檢查 AI 聽到的內容，再將錄音分享給老師。</p>
+        <p class="muted">錄下你的英文，看看系統聽到什麼；若有聽錯的字，再單獨練習。</p>
 
         <div class="steps">
           <div class="step">1. 錄音</div>
@@ -443,7 +443,7 @@
           <button id="recordBtn" class="record-btn">● 開始錄音</button>
           <button id="stopBtn" class="record-btn danger hidden">■ 停止</button>
         </div>
-        <div id="status" class="status">為了讓 AI 辨識較穩定，建議使用電腦版 Chrome。iPhone 瀏覽器的辨識結果可能較不穩定。</div>
+        <div id="status" class="status">此工具使用瀏覽器的免費英文語音辨識。電腦版 Chrome 通常最穩定；iPhone/Safari 可能較容易漏字，但錄音本身仍會正常保存。</div>
 
         <section id="resultPanel" class="panel hidden">
           <h2>聽聽你的錄音</h2>
@@ -559,6 +559,9 @@
     let correctionChunks = [];
     let recognitionEnded = true;
     let pendingFinalizeTimer = null;
+     let recognitionRestartTimer = null;
+     let recognitionHadAnyResult = false;
+     let recognitionErrorCount = 0;
 
     const $ = (id) => document.getElementById(id);
 
@@ -583,6 +586,7 @@
     const correctionsList = $('correctionsList');
     const correctionsCards = $('correctionsCards');
     const shareBtn = $('shareBtn');
+     const retryListenBtn = $('retryListenBtn');
     const recordAgainBtn = $('recordAgainBtn');
     const copyBtn = $('copyBtn');
     const shareUrlBox = $('shareUrl');
@@ -619,32 +623,65 @@
 
       recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
-      recognition.continuous = true;
+      // iOS/Safari often behaves better when each listening segment is short.
+      // We restart automatically while the student is still recording.
+      const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      recognition.continuous = !isiOS;
       recognition.interimResults = true;
+      recognition.maxAlternatives = 3;
+
+      recognition.onstart = () => {
+        recognitionEnded = false;
+      };
 
       recognition.onresult = (event) => {
+        recognitionHadAnyResult = true;
         interimTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const text = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalTranscript += text + ' ';
+            finalTranscript += text.trim() + ' ';
           } else {
             interimTranscript += text;
           }
         }
-        const liveText = (finalTranscript + interimTranscript).trim();
-        aiTranscriptText = liveText;
+        aiTranscriptText = (finalTranscript + interimTranscript).trim();
       };
 
       recognition.onerror = (event) => {
+        recognitionErrorCount += 1;
         console.warn('Speech recognition error:', event.error);
+
+        // 'no-speech' is common when students pause between words. It is not a failure.
+        if (event.error === 'no-speech' && isRecording) {
+          setStatus('還在錄音中。單字之間可以停一下，系統會繼續聽。', 'recording');
+          return;
+        }
+
+        if (event.error === 'audio-capture') {
+          setStatus('語音辨識暫時無法取得麥克風聲音。請確認瀏覽器的麥克風權限。', 'error');
+        } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          setStatus('瀏覽器沒有允許語音辨識。請開啟麥克風／語音辨識權限後再試一次。', 'error');
+        } else if (event.error === 'network') {
+          setStatus('語音辨識服務目前連線不穩。錄音仍會保留，可稍後再錄一次。', 'error');
+        }
       };
 
       recognition.onend = () => {
         recognitionEnded = true;
         if (isRecording) {
-          recognitionEnded = false;
-          try { recognition.start(); } catch (e) { recognitionEnded = true; }
+          if (recognitionRestartTimer) clearTimeout(recognitionRestartTimer);
+          recognitionRestartTimer = setTimeout(() => {
+            if (!isRecording || !recognition) return;
+            try {
+              recognitionEnded = false;
+              recognition.start();
+            } catch (e) {
+              recognitionEnded = true;
+              console.warn('Recognition restart failed:', e);
+            }
+          }, 250);
         }
       };
     }
@@ -699,7 +736,7 @@
           // SpeechRecognition often returns its final words a little later than MediaRecorder.
           // Wait briefly so the original transcript and the editable transcript use the SAME snapshot.
           if (pendingFinalizeTimer) clearTimeout(pendingFinalizeTimer);
-          pendingFinalizeTimer = setTimeout(finalizeRecordingResult, 900);
+          pendingFinalizeTimer = setTimeout(finalizeRecordingResult, 1800);
         };
 
         setupRecognition();
@@ -712,7 +749,7 @@
         isRecording = true;
         recordBtn.classList.add('hidden');
         stopBtn.classList.remove('hidden');
-        setStatus('錄音中…請清楚地說英文。', 'recording');
+        setStatus('錄音中…請用自然速度說英文。念單字時可以短暫停頓，系統會繼續聽。', 'recording');
       } catch (err) {
         console.error(err);
         setStatus('無法使用麥克風。請允許麥克風權限後再試一次。', 'error');
@@ -720,13 +757,19 @@
     }
 
     function finalizeRecordingResult() {
-      aiTranscriptText = (finalTranscript + interimTranscript).trim();
+      // Prefer the stable final text. Keep the last interim text only if no final result arrived.
+      const stableText = finalTranscript.trim();
+      const fallbackText = interimTranscript.trim();
+      aiTranscriptText = stableText || fallbackText;
       buildWordEditor(aiTranscriptText);
       resultPanel.classList.remove('hidden');
+
       if (aiTranscriptText) {
-        setStatus('錄音完成。請先重聽，再檢查 AI 辨識結果。', 'ok');
+        setStatus('錄音完成。請先重聽，再看看 AI 聽到的內容。AI 聽錯不一定代表你的發音一定錯。', 'ok');
+      } else if (!getSpeechRecognitionClass()) {
+        setStatus('錄音完成，但這個瀏覽器不支援免費語音辨識。錄音仍可播放；建議改用 Chrome 再試。', 'error');
       } else {
-        setStatus('錄音完成，但沒有辨識到文字。你可以重新錄音，建議使用電腦版 Chrome。', 'error');
+        setStatus('錄音有成功，但這次語音辨識沒有回傳文字。這不一定是發音問題；可先重聽錄音，再按「整段重錄」試一次。', 'error');
       }
     }
 
@@ -763,6 +806,7 @@
       finalTranscript = '';
       interimTranscript = '';
       if (pendingFinalizeTimer) { clearTimeout(pendingFinalizeTimer); pendingFinalizeTimer = null; }
+       if (recognitionRestartTimer) { clearTimeout(recognitionRestartTimer); recognitionRestartTimer = null; }
       audioBlob = null;
       setStatus('準備完成。準備好後請按「開始錄音」。');
       shareBtn.disabled = false;
@@ -1180,6 +1224,13 @@
         viewerStatus.className = 'status error';
       }
     }
+
+
+    retryListenBtn.addEventListener('click', () => {
+      if (!audioPlayer.src) return;
+      audioPlayer.currentTime = 0;
+      audioPlayer.play().catch(() => {});
+    });
 
     recordBtn.addEventListener('click', startRecording);
     stopBtn.addEventListener('click', stopRecording);
