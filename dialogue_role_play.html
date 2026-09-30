@@ -124,6 +124,67 @@ video{width:100%;height:100%;object-fit:cover;background:#111}
 .ai-loading::before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid #c9c8ec;border-top-color:var(--accent);animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+
+/* speaking feedback */
+.speaking-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin-top:14px;
+}
+.speaking-card{
+  border:1px solid #e8e8f4;
+  border-radius:16px;
+  padding:15px;
+  background:linear-gradient(180deg,#fff,#f8f8ff);
+}
+.speaking-card.full{grid-column:1/-1}
+.speaking-title{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  font-weight:850;
+  margin-bottom:8px;
+}
+.level-badge{
+  white-space:nowrap;
+  border-radius:999px;
+  padding:5px 9px;
+  font-size:12px;
+  font-weight:850;
+}
+.level-strong{background:#eaf9f3;color:#137454;border:1px solid #c8ecdf}
+.level-developing{background:#fff7df;color:#94640d;border:1px solid #f0dfac}
+.level-needs{background:#fff0f0;color:#bf3e3e;border:1px solid #ffd1d1}
+.issue-list{margin:8px 0 0;padding-left:20px}
+.issue-list li{margin:7px 0}
+.practice-chip{
+  display:inline-block;
+  margin:4px 5px 4px 0;
+  padding:7px 10px;
+  border-radius:999px;
+  background:#f0efff;
+  border:1px solid #dedcf7;
+  color:#4e4ea4;
+  font-weight:750;
+  font-size:13px;
+}
+#videoShell.portrait video,
+.video-shell.portrait video{
+  object-fit:contain;
+  background:#111;
+}
+.speaking-note{
+  font-size:13px;
+  color:var(--muted);
+  margin-top:10px;
+}
+@media(max-width:650px){
+  .speaking-grid{grid-template-columns:1fr}
+  .speaking-card.full{grid-column:auto}
+}
+
 </style>
 </head>
 <body>
@@ -137,10 +198,10 @@ video{width:100%;height:100%;object-fit:cover;background:#111}
 
 <div class="steps">
  <div class="step"><b>✍️</b>1. 寫對話</div>
- <div class="step"><b>💡</b>2. 看回饋</div>
+ <div class="step"><b>💡</b>2. AI 回饋</div>
  <div class="step"><b>📝</b>3. 修改</div>
  <div class="step"><b>🎥</b>4. 錄影</div>
- <div class="step"><b>🔗</b>5. 分享</div>
+ <div class="step"><b>🎧</b>5. 口說分析</div>
 </div>
 
 <div class="field">
@@ -167,25 +228,15 @@ B: Yes. I'm looking for a jacket.
 A: What size do you need?
 B: Medium, please."></textarea>
 <div class="row" style="margin-top:12px">
- <button id="feedbackBtn">⚡ Quick Check</button>
- <button id="aiFeedbackBtn" class="secondary">✨ AI Feedback</button>
+ <button id="aiFeedbackBtn">✨ AI Language Feedback</button>
 </div>
 </section>
 
 <section id="feedbackSection" class="section hidden">
-<h2>💡 Step 2　回饋</h2>
-<div class="notice"><strong>Quick Check</strong>：快速抓明顯問題與結構提醒。<br><strong>AI Feedback</strong>：依照 Situation / Topic 判斷日常情境下是否自然，並維持 A2–B1 難度。</div>
-
-<div style="margin-top:16px">
-  <h3>⚡ Quick Check</h3>
-  <div id="feedbackBox" class="feedback"></div>
-</div>
-
-<div style="margin-top:18px">
-  <h3>✨ AI Feedback</h3>
-  <div id="aiStatus" class="status">按上方「AI Feedback」取得情境式回饋。</div>
-  <div id="aiFeedbackBox" class="ai-feedback-grid hidden"></div>
-</div>
+<h2>💡 Step 2　AI Language Feedback</h2>
+<p class="muted">AI 會依照 Situation / Topic 檢查文法、清楚度，以及在這個日常情境下是否自然，同時維持 A2–B1 程度。</p>
+<div id="aiStatus" class="status">按上方「AI Language Feedback」取得情境式回饋。</div>
+<div id="aiFeedbackBox" class="ai-feedback-grid hidden"></div>
 </section>
 
 <section id="revisionSection" class="section hidden">
@@ -224,6 +275,14 @@ B: Medium, please."></textarea>
  <span id="timer" class="timer">00:00</span>
 </div>
 <div id="videoStatus" class="status">請先完成修改稿，再開啟相機。</div>
+
+<div id="speakingAction" class="hidden" style="margin-top:16px">
+  <button id="speakingBtn">🎧 Analyze Speaking</button>
+  <p class="speaking-note">分析會參考修改後對話稿與實際錄影，提供發音與自然口語回饋。這是學習建議，不是正式語音測驗分數。</p>
+</div>
+
+<div id="speakingStatus" class="status hidden"></div>
+<div id="speakingFeedbackBox" class="speaking-grid hidden"></div>
 </section>
 
 <section id="shareSection" class="section hidden">
@@ -255,24 +314,24 @@ B: Medium, please."></textarea>
 </section>
 
 <section class="section">
-<h2>2. Quick Check</h2>
-<div id="vFeedback" class="feedback"></div>
-</section>
-
-<section class="section">
-<h2>3. AI Feedback</h2>
+<h2>2. AI Language Feedback</h2>
 <div id="vAIFeedback" class="ai-feedback-grid"></div>
 </section>
 
 <section class="section">
-<h2>4. 修改後對話稿</h2>
+<h2>3. 修改後對話稿</h2>
 <div id="vRevised" class="script-box"></div>
 </section>
 
 <section class="section">
-<h2>5. 最終錄影</h2>
+<h2>4. 最終錄影</h2>
 <div class="video-shell"><video id="vVideo" controls playsinline></video></div>
 <p id="vSubmitted" class="muted small"></p>
+</section>
+
+<section class="section">
+<h2>5. Speaking Feedback</h2>
+<div id="vSpeakingFeedback" class="speaking-grid"></div>
 </section>
 </div>
 
@@ -289,8 +348,11 @@ const $=id=>document.getElementById(id);
 const MAX_SECONDS=180;
 
 let stream=null, recorder=null, chunks=[], videoBlob=null, timerInt=null, startedAt=0;
-let feedbackData=[];
 let aiFeedbackData=null;
+let speakingFeedbackData=null;
+let currentSubmissionId=null;
+let uploadedVideoPath=null;
+let uploadedVideoBucket=null;
 let selectedOrientation='landscape';
 
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]))}
@@ -305,6 +367,164 @@ function validateBasics(){
 
 
 const EDGE_FUNCTION_URL='https://cufnvllcqoppwydygond.supabase.co/functions/v1/dialogue-feedback';
+const SPEAKING_FUNCTION_URL='https://cufnvllcqoppwydygond.supabase.co/functions/v1/speaking-feedback';
+
+
+function levelClass(level=''){
+  const x=String(level).toLowerCase();
+  if(x.includes('strong')) return 'level-strong';
+  if(x.includes('need')) return 'level-needs';
+  return 'level-developing';
+}
+
+function renderSpeaking(target, data){
+  if(!data){
+    target.innerHTML='<p class="muted">尚未取得 Speaking Feedback。</p>';
+    return;
+  }
+
+  const metric=(title,obj)=>`
+    <div class="speaking-card">
+      <div class="speaking-title">
+        <span>${esc(title)}</span>
+        <span class="level-badge ${levelClass(obj?.level)}">${esc(obj?.level||'Developing')}</span>
+      </div>
+      <div>${esc(obj?.feedback||'')}</div>
+    </div>`;
+
+  const vowelIssues=(data.pronunciation_accuracy?.vowel_issues||[]);
+  const consonantIssues=(data.pronunciation_accuracy?.consonant_issues||[]);
+  const practice=(data.practice_words||[]);
+
+  const issueHtml=[...vowelIssues,...consonantIssues].map(x=>`
+    <li>
+      <strong>${esc(x.word||'')}</strong>
+      ${x.contrast?` — ${esc(x.contrast)}`:''}
+      <br><span class="muted">${esc(x.feedback||'')}</span>
+    </li>`).join('');
+
+  target.innerHTML=`
+    <div class="speaking-card full">
+      <div class="speaking-title"><span>🎤 Overall</span></div>
+      <div>${esc(data.overall||'')}</div>
+    </div>
+
+    ${metric('Vowel Accuracy', data.pronunciation_accuracy?.vowels)}
+    ${metric('Consonant Accuracy', data.pronunciation_accuracy?.consonants)}
+    ${metric('Word Stress', data.pronunciation_accuracy?.word_stress)}
+    ${metric('Intonation & Expression', data.natural_speech?.intonation_expression)}
+    ${metric('Sentence Stress', data.natural_speech?.sentence_stress)}
+    ${metric('Connected Speech', data.natural_speech?.connected_speech)}
+    ${metric('Rhythm', data.natural_speech?.rhythm)}
+    ${metric('Chunking & Pausing', data.natural_speech?.chunking_pausing)}
+    ${metric('Interaction & Flow', data.natural_speech?.interaction_flow)}
+
+    <div class="speaking-card full">
+      <div class="speaking-title"><span>🔎 Sounds / words to notice</span></div>
+      ${issueHtml?`<ul class="issue-list">${issueHtml}</ul>`:'<p class="muted">沒有足夠明確的單字發音問題需要特別標示。</p>'}
+    </div>
+
+    <div class="speaking-card full">
+      <div class="speaking-title"><span>🎯 Practice words</span></div>
+      <div>
+        ${practice.length
+          ? practice.map(x=>`<span class="practice-chip">${esc(x.word||'')} — ${esc(x.focus||'')}</span>`).join('')
+          : '<span class="muted">—</span>'}
+      </div>
+      ${practice.length?practice.map(x=>`<p class="small"><strong>${esc(x.word||'')}:</strong> ${esc(x.tip||'')}</p>`).join(''):''}
+    </div>
+
+    <div class="speaking-card full">
+      <div class="speaking-title"><span>➡️ Next speaking goal</span></div>
+      <div>${esc(data.next_goal||'')}</div>
+    </div>
+  `;
+}
+
+async function ensureVideoUploaded(){
+  if(uploadedVideoPath && uploadedVideoBucket && currentSubmissionId){
+    return {
+      id:currentSubmissionId,
+      path:uploadedVideoPath,
+      bucket:uploadedVideoBucket,
+      url:publicUrl(uploadedVideoBucket,uploadedVideoPath)
+    };
+  }
+  if(!videoBlob) throw new Error('請先完成正式錄影。');
+
+  const id=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));
+  const ext=videoBlob.type.includes('mp4')?'mp4':'webm';
+  const videoPath=`video-dialogue/${id}/final.${ext}`;
+  const b=await uploadAuto(videoPath,videoBlob,videoBlob.type||'video/webm');
+
+  currentSubmissionId=id;
+  uploadedVideoPath=videoPath;
+  uploadedVideoBucket=b;
+
+  return {id,path:videoPath,bucket:b,url:publicUrl(b,videoPath)};
+}
+
+async function getSpeakingFeedback(){
+  if(!videoBlob){ alert('請先完成正式錄影。'); return; }
+  if(!$('revisedScript').value.trim()){ alert('請先完成修改後對話稿。'); return; }
+
+  const btn=$('speakingBtn');
+  const status=$('speakingStatus');
+  const box=$('speakingFeedbackBox');
+
+  btn.disabled=true;
+  status.className='status';
+  status.classList.remove('hidden');
+  status.innerHTML='<span class="ai-loading">正在上傳並分析口語表現，可能需要一些時間…</span>';
+  box.classList.add('hidden');
+
+  try{
+    const uploaded=await ensureVideoUploaded();
+
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),120000);
+
+    const res=await fetch(SPEAKING_FUNCTION_URL,{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':`Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey':SUPABASE_ANON_KEY
+      },
+      body:JSON.stringify({
+        videoUrl:uploaded.url,
+        mimeType:videoBlob.type||'video/webm',
+        revisedScript:$('revisedScript').value.trim(),
+        situation:$('situationTopic').value.trim()
+      }),
+      signal:controller.signal
+    });
+
+    clearTimeout(timer);
+    const raw=await res.text();
+    if(!res.ok) throw new Error(`Speaking Feedback ${res.status}: ${raw}`);
+
+    let data;
+    try{ data=JSON.parse(raw); }
+    catch{ throw new Error('口語回饋格式無法讀取。'); }
+
+    if(data.error) throw new Error(data.error);
+
+    speakingFeedbackData=data;
+    renderSpeaking(box,data);
+    box.classList.remove('hidden');
+    status.className='status ok';
+    status.textContent='Speaking Feedback 已完成。請先看一個最需要改善的目標，再決定是否重錄。';
+  }catch(e){
+    status.className='status error';
+    status.textContent=e.name==='AbortError'
+      ? '口語分析逾時，請稍後再試，或縮短影片。'
+      : 'Speaking Feedback 失敗：'+e.message;
+  }finally{
+    btn.disabled=false;
+  }
+}
+
 
 function renderAI(target, data){
   if(!data){
@@ -396,7 +616,7 @@ async function getAIFeedback(){
     renderAI(box,data);
     box.classList.remove('hidden');
     status.className='status ok';
-    status.textContent='AI Feedback 已完成。請比較原句與建議，再自己修改對話。';
+    status.textContent='AI Language Feedback 已完成。請比較原句與建議，再自己修改對話。';
 
     $('feedbackSection').classList.remove('hidden');
     $('revisionSection').classList.remove('hidden');
@@ -418,63 +638,9 @@ async function getAIFeedback(){
   }
 }
 
-function makeFeedback(script){
-  const tips=[];
-  const situation=($('situationTopic')?.value||'').trim();
-  if(situation){
-    tips.push({type:'Situation',text:`情境：${situation}。請確認語氣、用字和角色關係符合這個場合。`});
-  }
-  const lines=script.split(/\n+/).map(s=>s.trim()).filter(Boolean);
-  const words=script.trim().split(/\s+/).filter(Boolean);
-
-  if(lines.length<4) tips.push({type:'Structure',text:'對話偏短。可以增加問句、回應或結尾，讓互動更完整。'});
-  if(lines.length>=4) tips.push({type:'Structure',text:`目前約有 ${lines.length} 個對話回合，長度適合進一步練習。`});
-
-  const questionCount=(script.match(/\?/g)||[]).length;
-  if(questionCount===0) tips.push({type:'Interaction',text:'目前沒有問句。真實對話通常會有提問與回應，可以考慮加入至少一個問題。'});
-  else tips.push({type:'Interaction',text:`有 ${questionCount} 個問句，已經有互動感。請再確認每個問題後都有自然的回應。`});
-
-  const common=[
-    [/\bI am agree\b/gi,'把 “I am agree” 改成 “I agree”.'],
-    [/\bI very like\b/gi,'把 “I very like …” 改成 “I really like …”.'],
-    [/\bwant to going\b/gi,'want to 後面接原形動詞，例如 “want to go”.'],
-    [/\blet'?s\s+\w+ing\b/gi,'Let’s 後面通常接原形動詞，例如 “Let’s go.”'],
-    [/\bdiscuss about\b/gi,'discuss 後面通常直接接受詞，不需要 about。'],
-    [/\bHow about to\b/gi,'How about 後面可接 V-ing，例如 “How about going …?”']
-  ];
-  common.forEach(([r,msg])=>{if(r.test(script))tips.push({type:'Language',text:msg})});
-
-  if(/\bdo not\b|\bcannot\b|\bI am\b|\bwe are\b/i.test(script))
-    tips.push({type:'Speaking style',text:'如果情境是日常口語，可以適度使用縮寫（don’t, can’t, I’m, we’re），聽起來會更自然。'});
-
-  const veryLong=lines.filter(l=>l.split(/\s+/).length>18);
-  if(veryLong.length) tips.push({type:'Speaking style',text:'有些句子較長。口說演示可以拆成較短的句子，會比較自然也比較好記。'});
-
-  if(words.length<25) tips.push({type:'Length',text:`目前約 ${words.length} 個英文單字。若作業需要完整情境，可以再補一些細節。`});
-  else tips.push({type:'Length',text:`目前約 ${words.length} 個英文單字。正式錄影前，請實際念一次確認長度與節奏。`});
-
-  tips.push({type:'Final check',text:'請自己再檢查：角色是否輪流說話？語氣是否符合情境？最後一句是否有自然的結尾？'});
-  return tips;
-}
-
-function renderFeedback(target, data){
-  target.innerHTML=data.map(x=>`<div class="feedback-item"><strong>${esc(x.type)}</strong><br>${esc(x.text)}</div>`).join('');
-}
 
 $('aiFeedbackBtn').onclick=getAIFeedback;
 
-$('feedbackBtn').onclick=()=>{
-  if(!validateBasics())return;
-  const s=$('originalScript').value.trim();
-  feedbackData=makeFeedback(s);
-  renderFeedback($('feedbackBox'),feedbackData);
-  if(!$('revisedScript').value.trim()) $('revisedScript').value=s;
-  $('feedbackSection').classList.remove('hidden');
-  $('revisionSection').classList.remove('hidden');
-  $('videoSection').classList.remove('hidden');
-  $('shareSection').classList.remove('hidden');
-  $('feedbackSection').scrollIntoView({behavior:'smooth',block:'start'});
-};
 
 function bestMime(){
  const types=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'];
@@ -504,8 +670,20 @@ $('cameraBtn').onclick=async()=>{
  try{
   if(stream) stream.getTracks().forEach(t=>t.stop());
   const videoConstraints = selectedOrientation==='portrait'
-    ? {facingMode:'user', width:{ideal:720}, height:{ideal:1280}, aspectRatio:{ideal:9/16}}
-    : {facingMode:'user', width:{ideal:1280}, height:{ideal:720}, aspectRatio:{ideal:16/9}};
+    ? {
+        facingMode:'user',
+        width:{ideal:720},
+        height:{ideal:1280},
+        aspectRatio:{ideal:9/16},
+        resizeMode:'none'
+      }
+    : {
+        facingMode:'user',
+        width:{ideal:1280},
+        height:{ideal:720},
+        aspectRatio:{ideal:16/9},
+        resizeMode:'none'
+      };
   stream=await navigator.mediaDevices.getUserMedia({video:videoConstraints,audio:true});
   $('liveVideo').srcObject=stream;$('liveVideo').classList.remove('hidden');$('playbackVideo').classList.add('hidden');
   await $('liveVideo').play();
@@ -528,7 +706,14 @@ $('recordBtn').onclick=()=>{
    $('playbackVideo').classList.remove('hidden');$('liveVideo').classList.add('hidden');
    $('redoBtn').classList.remove('hidden');
    $('recordBtn').classList.add('hidden');$('stopBtn').classList.add('hidden');
-   setVideoStatus(`錄影完成（${(videoBlob.size/1024/1024).toFixed(1)} MB）。請播放確認後再分享。`,'ok');
+   setVideoStatus(`錄影完成（${(videoBlob.size/1024/1024).toFixed(1)} MB）。請播放確認，並可取得 Speaking Feedback。`,'ok');
+   $('speakingAction').classList.remove('hidden');
+   $('speakingStatus').classList.add('hidden');
+   $('speakingFeedbackBox').classList.add('hidden');
+   speakingFeedbackData=null;
+   currentSubmissionId=null;
+   uploadedVideoPath=null;
+   uploadedVideoBucket=null;
  };
  recorder.start(500);
  startedAt=Date.now();
@@ -551,6 +736,13 @@ $('redoBtn').onclick=()=>{
  $('playbackVideo').classList.add('hidden');$('liveVideo').classList.remove('hidden');
  $('recordBtn').classList.remove('hidden');$('recordBtn').disabled=false;$('redoBtn').classList.add('hidden');
  $('timer').textContent='00:00';setVideoStatus('可以重新錄影。','');
+ $('speakingAction').classList.add('hidden');
+ $('speakingStatus').classList.add('hidden');
+ $('speakingFeedbackBox').classList.add('hidden');
+ speakingFeedbackData=null;
+ currentSubmissionId=null;
+ uploadedVideoPath=null;
+ uploadedVideoBucket=null;
 };
 
 async function uploadOne(bucket,path,body,contentType){
@@ -572,6 +764,8 @@ async function uploadAuto(path,body,contentType){
 }
 function publicUrl(bucket,path){return `${SUPABASE_URL}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodeURIComponent(path).replace(/%2F/g,'/')}`}
 
+$('speakingBtn').onclick=getSpeakingFeedback;
+
 $('shareBtn').onclick=async()=>{
  if(!validateBasics())return;
  if(!$('revisedScript').value.trim()){alert('請完成修改後對話稿。');return;}
@@ -579,15 +773,15 @@ $('shareBtn').onclick=async()=>{
  const st=$('uploadStatus');st.className='status';st.classList.remove('hidden');st.textContent='正在上傳影片與學習歷程，請不要關閉頁面…';
  $('shareBtn').disabled=true;
  try{
-  const id=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));
-  const ext=videoBlob.type.includes('mp4')?'mp4':'webm';
-  const videoPath=`video-dialogue/${id}/final.${ext}`;
+  const uploaded=await ensureVideoUploaded();
+  const id=uploaded.id;
+  const videoPath=uploaded.path;
+  const b=uploaded.bucket;
   const metaPath=`video-dialogue/${id}/data.json`;
-  const b=await uploadAuto(videoPath,videoBlob,videoBlob.type||'video/webm');
   const meta={
    id,student:$('studentName').value.trim(),task:$('taskName').value.trim(),
    situation:$('situationTopic').value.trim(),
-   originalScript:$('originalScript').value.trim(),feedback:feedbackData,aiFeedback:aiFeedbackData,
+   originalScript:$('originalScript').value.trim(),aiFeedback:aiFeedbackData,speakingFeedback:speakingFeedbackData,
    revisedScript:$('revisedScript').value.trim(),videoPath,bucket:b,
    orientation:selectedOrientation,
    submittedAt:new Date().toISOString()
@@ -617,8 +811,8 @@ async function loadSubmission(){
  $('vStudent').textContent=meta.student||'—';$('vTask').textContent=meta.task||'—';
  $('vSituation').textContent=meta.situation||'—';
  $('vOriginal').textContent=meta.originalScript||'';
- renderFeedback($('vFeedback'),meta.feedback||[]);
  renderAI($('vAIFeedback'),meta.aiFeedback||null);
+ renderSpeaking($('vSpeakingFeedback'),meta.speakingFeedback||null);
  $('vRevised').textContent=meta.revisedScript||'';
  $('vVideo').src=publicUrl(b,meta.videoPath);
  if(meta.orientation==='portrait'){
