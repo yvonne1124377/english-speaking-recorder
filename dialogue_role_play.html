@@ -139,6 +139,13 @@ video{width:100%;height:100%;object-fit:cover;background:#111}
  <input id="taskName" type="text" maxlength="100" placeholder="例如：Restaurant Role-play">
 </div>
 
+<div class="field">
+ <label>Situation / Topic <span class="required">（必填）</span></label>
+ <input id="situationTopic" type="text" maxlength="180"
+   placeholder="例如：Small talk with a new classmate / Talking about our campus">
+ <p class="muted small">請寫出這段對話發生的情境或主題，之後 AI 會依照這個情境判斷用語是否自然。</p>
+</div>
+
 <section class="section">
 <h2>✍️ Step 1　原始對話稿</h2>
 <p class="muted">請先自己完成英文對話。建議一人一句，角色名稱放在句首。</p>
@@ -215,6 +222,7 @@ B: Medium, please."></textarea>
 <div class="meta">
  <div class="meta-box"><div class="meta-label">Student</div><div id="vStudent" class="meta-value"></div></div>
  <div class="meta-box"><div class="meta-label">Task</div><div id="vTask" class="meta-value"></div></div>
+ <div class="meta-box" style="grid-column:1/-1"><div class="meta-label">Situation / Topic</div><div id="vSituation" class="meta-value"></div></div>
 </div>
 
 <section class="section">
@@ -260,12 +268,17 @@ function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&l
 function validateBasics(){
   if(!$('studentName').value.trim()){alert('請填寫學生姓名。');$('studentName').focus();return false;}
   if(!$('taskName').value.trim()){alert('請填寫作業名稱。');$('taskName').focus();return false;}
+  if(!$('situationTopic').value.trim()){alert('請填寫 Situation / Topic。');$('situationTopic').focus();return false;}
   if(!$('originalScript').value.trim()){alert('請先輸入原始對話稿。');$('originalScript').focus();return false;}
   return true;
 }
 
 function makeFeedback(script){
   const tips=[];
+  const situation=($('situationTopic')?.value||'').trim();
+  if(situation){
+    tips.push({type:'Situation',text:`情境：${situation}。請確認語氣、用字和角色關係符合這個場合。`});
+  }
   const lines=script.split(/\n+/).map(s=>s.trim()).filter(Boolean);
   const words=script.trim().split(/\s+/).filter(Boolean);
 
@@ -426,6 +439,7 @@ $('shareBtn').onclick=async()=>{
   const b=await uploadAuto(videoPath,videoBlob,videoBlob.type||'video/webm');
   const meta={
    id,student:$('studentName').value.trim(),task:$('taskName').value.trim(),
+   situation:$('situationTopic').value.trim(),
    originalScript:$('originalScript').value.trim(),feedback:feedbackData,
    revisedScript:$('revisedScript').value.trim(),videoPath,bucket:b,
    orientation:selectedOrientation,
@@ -454,6 +468,7 @@ async function loadSubmission(){
  if(!meta){$('viewerTitle').textContent='找不到這份作業';return}
  b=meta.bucket||b;
  $('vStudent').textContent=meta.student||'—';$('vTask').textContent=meta.task||'—';
+ $('vSituation').textContent=meta.situation||'—';
  $('vOriginal').textContent=meta.originalScript||'';
  renderFeedback($('vFeedback'),meta.feedback||[]);
  $('vRevised').textContent=meta.revisedScript||'';
