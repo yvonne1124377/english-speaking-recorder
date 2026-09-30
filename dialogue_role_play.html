@@ -74,6 +74,43 @@ video{width:100%;height:100%;object-fit:cover;background:#111}
  .steps{grid-template-columns:repeat(5,minmax(80px,1fr));overflow-x:auto}.step{min-width:80px}
  .meta{grid-template-columns:1fr}.row button{flex:1}.sharebox{flex-direction:column}
 }
+
+.orientation-options{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin:14px 0 6px;
+}
+.orientation-card{
+  border:1.5px solid var(--line);
+  border-radius:16px;
+  padding:14px 15px;
+  background:#fff;
+  cursor:pointer;
+  transition:.18s ease;
+}
+.orientation-card:hover{
+  border-color:var(--accent2);
+  box-shadow:0 6px 18px rgba(91,91,214,.08);
+}
+.orientation-card input{margin-right:8px}
+.orientation-card strong{display:block;margin-bottom:3px}
+.orientation-card span{display:block;color:var(--muted);font-size:13px;margin-left:24px}
+.orientation-card.selected{
+  border-color:var(--accent2);
+  background:#f7f6ff;
+  box-shadow:0 0 0 3px rgba(124,110,230,.08);
+}
+.video-shell.portrait{
+  width:min(420px,100%);
+  aspect-ratio:9/16;
+  margin-left:auto;
+  margin-right:auto;
+}
+@media(max-width:650px){
+  .orientation-options{grid-template-columns:1fr}
+}
+
 </style>
 </head>
 <body>
@@ -129,7 +166,22 @@ B: Medium, please."></textarea>
 <section id="videoSection" class="section hidden">
 <h2>🎥 Step 4　正式錄影</h2>
 <p class="muted">完成修改後再錄影演示。第一版設定最長 <strong>3 分鐘</strong>，避免影片過大。</p>
-<div class="video-shell">
+
+<div class="field">
+  <label>拍攝方向</label>
+  <div class="orientation-options">
+    <label id="landscapeCard" class="orientation-card selected">
+      <strong><input type="radio" name="orientation" value="landscape" checked> 橫向 16:9</strong>
+      <span>適合兩人同框</span>
+    </label>
+    <label id="portraitCard" class="orientation-card">
+      <strong><input type="radio" name="orientation" value="portrait"> 直向 9:16</strong>
+      <span>適合一人演示</span>
+    </label>
+  </div>
+</div>
+
+<div id="videoShell" class="video-shell">
  <video id="liveVideo" playsinline muted></video>
  <video id="playbackVideo" class="hidden" playsinline controls></video>
 </div>
@@ -201,6 +253,7 @@ const MAX_SECONDS=180;
 
 let stream=null, recorder=null, chunks=[], videoBlob=null, timerInt=null, startedAt=0;
 let feedbackData=[];
+let selectedOrientation='landscape';
 
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]))}
 
@@ -269,10 +322,31 @@ function bestMime(){
 }
 function setVideoStatus(text,cls=''){const el=$('videoStatus');el.className='status'+(cls?' '+cls:'');el.textContent=text}
 
+
+document.querySelectorAll('input[name="orientation"]').forEach(radio=>{
+  radio.addEventListener('change',()=>{
+    selectedOrientation=radio.value;
+    $('landscapeCard').classList.toggle('selected',selectedOrientation==='landscape');
+    $('portraitCard').classList.toggle('selected',selectedOrientation==='portrait');
+    $('videoShell').classList.toggle('portrait',selectedOrientation==='portrait');
+
+    if(stream){
+      stream.getTracks().forEach(t=>t.stop());
+      stream=null;
+      $('liveVideo').srcObject=null;
+      $('recordBtn').disabled=true;
+      setVideoStatus('拍攝方向已變更，請重新按「開啟相機」。','');
+    }
+  });
+});
+
 $('cameraBtn').onclick=async()=>{
  try{
   if(stream) stream.getTracks().forEach(t=>t.stop());
-  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:true});
+  const videoConstraints = selectedOrientation==='portrait'
+    ? {facingMode:'user', width:{ideal:720}, height:{ideal:1280}, aspectRatio:{ideal:9/16}}
+    : {facingMode:'user', width:{ideal:1280}, height:{ideal:720}, aspectRatio:{ideal:16/9}};
+  stream=await navigator.mediaDevices.getUserMedia({video:videoConstraints,audio:true});
   $('liveVideo').srcObject=stream;$('liveVideo').classList.remove('hidden');$('playbackVideo').classList.add('hidden');
   await $('liveVideo').play();
   $('recordBtn').disabled=false;
@@ -354,6 +428,7 @@ $('shareBtn').onclick=async()=>{
    id,student:$('studentName').value.trim(),task:$('taskName').value.trim(),
    originalScript:$('originalScript').value.trim(),feedback:feedbackData,
    revisedScript:$('revisedScript').value.trim(),videoPath,bucket:b,
+   orientation:selectedOrientation,
    submittedAt:new Date().toISOString()
   };
   await uploadOne(b,metaPath,new Blob([JSON.stringify(meta)],{type:'application/json'}),'application/json');
@@ -383,6 +458,9 @@ async function loadSubmission(){
  renderFeedback($('vFeedback'),meta.feedback||[]);
  $('vRevised').textContent=meta.revisedScript||'';
  $('vVideo').src=publicUrl(b,meta.videoPath);
+ if(meta.orientation==='portrait'){
+   $('vVideo').parentElement.classList.add('portrait');
+ }
  $('vSubmitted').textContent='提交時間：'+new Date(meta.submittedAt).toLocaleString();
 }
 loadSubmission();
