@@ -111,6 +111,19 @@ video{width:100%;height:100%;object-fit:cover;background:#111}
   .orientation-options{grid-template-columns:1fr}
 }
 
+
+.ai-feedback-grid{display:grid;gap:14px;margin-top:14px}
+.ai-box{background:linear-gradient(180deg,#fbfbff,#f6f6ff);border:1px solid #e7e7f5;border-radius:16px;padding:16px}
+.ai-box h3{margin:0 0 9px;font-size:16px}
+.ai-item{background:#fff;border:1px solid #ececf4;border-radius:12px;padding:12px 13px;margin:9px 0}
+.ai-original{color:#7a4d4d;margin-bottom:4px}
+.ai-suggestion{color:#245b48;font-weight:700;margin-bottom:4px}
+.ai-reason{color:var(--muted);font-size:14px}
+.ai-good{display:inline-block;padding:6px 9px;margin:4px 5px 4px 0;border-radius:999px;background:#ecfaf5;color:#16805b;border:1px solid #cdeee1;font-size:13px;font-weight:700}
+.ai-loading{display:inline-flex;align-items:center;gap:8px}
+.ai-loading::before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid #c9c8ec;border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
 </style>
 </head>
 <body>
@@ -154,14 +167,25 @@ B: Yes. I'm looking for a jacket.
 A: What size do you need?
 B: Medium, please."></textarea>
 <div class="row" style="margin-top:12px">
- <button id="feedbackBtn">💡 取得語言回饋</button>
+ <button id="feedbackBtn">⚡ Quick Check</button>
+ <button id="aiFeedbackBtn" class="secondary">✨ AI Feedback</button>
 </div>
 </section>
 
 <section id="feedbackSection" class="section hidden">
-<h2>💡 Step 2　自動回饋</h2>
-<div class="notice">目前這個試作版先使用「自動語言檢查」來示範完整流程；它不是完整生成式 AI。若這個流程好用，下一階段可再接真正的 AI 回饋服務。</div>
-<div id="feedbackBox" class="feedback"></div>
+<h2>💡 Step 2　回饋</h2>
+<div class="notice"><strong>Quick Check</strong>：快速抓明顯問題與結構提醒。<br><strong>AI Feedback</strong>：依照 Situation / Topic 判斷日常情境下是否自然，並維持 A2–B1 難度。</div>
+
+<div style="margin-top:16px">
+  <h3>⚡ Quick Check</h3>
+  <div id="feedbackBox" class="feedback"></div>
+</div>
+
+<div style="margin-top:18px">
+  <h3>✨ AI Feedback</h3>
+  <div id="aiStatus" class="status">按上方「AI Feedback」取得情境式回饋。</div>
+  <div id="aiFeedbackBox" class="ai-feedback-grid hidden"></div>
+</div>
 </section>
 
 <section id="revisionSection" class="section hidden">
@@ -231,17 +255,22 @@ B: Medium, please."></textarea>
 </section>
 
 <section class="section">
-<h2>2. 系統回饋</h2>
+<h2>2. Quick Check</h2>
 <div id="vFeedback" class="feedback"></div>
 </section>
 
 <section class="section">
-<h2>3. 修改後對話稿</h2>
+<h2>3. AI Feedback</h2>
+<div id="vAIFeedback" class="ai-feedback-grid"></div>
+</section>
+
+<section class="section">
+<h2>4. 修改後對話稿</h2>
 <div id="vRevised" class="script-box"></div>
 </section>
 
 <section class="section">
-<h2>4. 最終錄影</h2>
+<h2>5. 最終錄影</h2>
 <div class="video-shell"><video id="vVideo" controls playsinline></video></div>
 <p id="vSubmitted" class="muted small"></p>
 </section>
@@ -261,6 +290,7 @@ const MAX_SECONDS=180;
 
 let stream=null, recorder=null, chunks=[], videoBlob=null, timerInt=null, startedAt=0;
 let feedbackData=[];
+let aiFeedbackData=null;
 let selectedOrientation='landscape';
 
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]))}
@@ -271,6 +301,117 @@ function validateBasics(){
   if(!$('situationTopic').value.trim()){alert('請填寫 Situation / Topic。');$('situationTopic').focus();return false;}
   if(!$('originalScript').value.trim()){alert('請先輸入原始對話稿。');$('originalScript').focus();return false;}
   return true;
+}
+
+
+const EDGE_FUNCTION_URL='https://cufnvllcqoppwydygond.supabase.co/functions/v1/dialogue-feedback';
+
+function renderAI(target, data){
+  if(!data){
+    target.innerHTML='<p class="muted">尚未取得 AI Feedback。</p>';
+    return;
+  }
+
+  const grammar=(data.grammar||[]).map(x=>`
+    <div class="ai-item">
+      <div class="ai-original"><strong>原句：</strong>${esc(x.original||'')}</div>
+      <div class="ai-suggestion"><strong>建議：</strong>${esc(x.suggestion||'')}</div>
+      <div class="ai-reason">${esc(x.reason||'')}</div>
+    </div>`).join('') || '<p class="muted">沒有明顯文法問題。</p>';
+
+  const natural=(data.natural_english||[]).map(x=>`
+    <div class="ai-item">
+      <div class="ai-original"><strong>原句：</strong>${esc(x.original||'')}</div>
+      <div class="ai-suggestion"><strong>更自然：</strong>${esc(x.suggestion||'')}</div>
+      <div class="ai-reason">${esc(x.reason||'')}</div>
+    </div>`).join('') || '<p class="muted">目前沒有需要特別調整的自然度問題。</p>';
+
+  const good=(data.good_sentences||[]).map(x=>`<span class="ai-good">${esc(x)}</span>`).join('') || '<span class="muted">—</span>';
+
+  target.innerHTML=`
+    <div class="ai-box">
+      <h3>整體回饋</h3>
+      <p>${esc(data.overall||'')}</p>
+    </div>
+    <div class="ai-box">
+      <h3>Grammar</h3>
+      ${grammar}
+    </div>
+    <div class="ai-box">
+      <h3>Natural English</h3>
+      ${natural}
+    </div>
+    <div class="ai-box">
+      <h3>Good sentences — 可以保留</h3>
+      <div>${good}</div>
+    </div>
+    <div class="ai-box">
+      <h3>Suggested dialogue — 參考版本</h3>
+      <div class="script-box">${esc(data.suggested_dialogue||'')}</div>
+      <p class="muted small">請把它當作參考，不需要整篇照抄。保留你原本想表達的內容，再完成自己的修改稿。</p>
+    </div>`;
+}
+
+async function getAIFeedback(){
+  if(!validateBasics()) return;
+
+  const btn=$('aiFeedbackBtn');
+  const status=$('aiStatus');
+  const box=$('aiFeedbackBox');
+
+  btn.disabled=true;
+  status.className='status';
+  status.innerHTML='<span class="ai-loading">AI 正在閱讀你的情境與對話…</span>';
+  box.classList.add('hidden');
+
+  try{
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),45000);
+
+    const res=await fetch(EDGE_FUNCTION_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        situation:$('situationTopic').value.trim(),
+        script:$('originalScript').value.trim()
+      }),
+      signal:controller.signal
+    });
+    clearTimeout(timer);
+
+    const raw=await res.text();
+    if(!res.ok) throw new Error(`AI Feedback ${res.status}: ${raw}`);
+
+    let data;
+    try{ data=JSON.parse(raw); }
+    catch{ throw new Error('AI 回傳格式無法讀取。'); }
+
+    if(data.error) throw new Error(data.error);
+
+    aiFeedbackData=data;
+    renderAI(box,data);
+    box.classList.remove('hidden');
+    status.className='status ok';
+    status.textContent='AI Feedback 已完成。請比較原句與建議，再自己修改對話。';
+
+    $('feedbackSection').classList.remove('hidden');
+    $('revisionSection').classList.remove('hidden');
+    $('videoSection').classList.remove('hidden');
+    $('shareSection').classList.remove('hidden');
+
+    if(!$('revisedScript').value.trim()){
+      $('revisedScript').value=$('originalScript').value.trim();
+    }
+
+    $('feedbackSection').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){
+    status.className='status error';
+    status.textContent=e.name==='AbortError'
+      ? 'AI 回饋逾時，請稍後再試。'
+      : 'AI 回饋失敗：'+e.message;
+  }finally{
+    btn.disabled=false;
+  }
 }
 
 function makeFeedback(script){
@@ -316,12 +457,14 @@ function renderFeedback(target, data){
   target.innerHTML=data.map(x=>`<div class="feedback-item"><strong>${esc(x.type)}</strong><br>${esc(x.text)}</div>`).join('');
 }
 
+$('aiFeedbackBtn').onclick=getAIFeedback;
+
 $('feedbackBtn').onclick=()=>{
   if(!validateBasics())return;
   const s=$('originalScript').value.trim();
   feedbackData=makeFeedback(s);
   renderFeedback($('feedbackBox'),feedbackData);
-  $('revisedScript').value=s;
+  if(!$('revisedScript').value.trim()) $('revisedScript').value=s;
   $('feedbackSection').classList.remove('hidden');
   $('revisionSection').classList.remove('hidden');
   $('videoSection').classList.remove('hidden');
@@ -440,7 +583,7 @@ $('shareBtn').onclick=async()=>{
   const meta={
    id,student:$('studentName').value.trim(),task:$('taskName').value.trim(),
    situation:$('situationTopic').value.trim(),
-   originalScript:$('originalScript').value.trim(),feedback:feedbackData,
+   originalScript:$('originalScript').value.trim(),feedback:feedbackData,aiFeedback:aiFeedbackData,
    revisedScript:$('revisedScript').value.trim(),videoPath,bucket:b,
    orientation:selectedOrientation,
    submittedAt:new Date().toISOString()
@@ -471,6 +614,7 @@ async function loadSubmission(){
  $('vSituation').textContent=meta.situation||'—';
  $('vOriginal').textContent=meta.originalScript||'';
  renderFeedback($('vFeedback'),meta.feedback||[]);
+ renderAI($('vAIFeedback'),meta.aiFeedback||null);
  $('vRevised').textContent=meta.revisedScript||'';
  $('vVideo').src=publicUrl(b,meta.videoPath);
  if(meta.orientation==='portrait'){
