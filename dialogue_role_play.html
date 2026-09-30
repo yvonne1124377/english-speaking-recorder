@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dialogue Role Play</title>
+<style>
+:root{
+  --bg:#f5f7ff;--card:#fff;--text:#202437;--muted:#6e7488;--line:#e6e8f2;
+  --accent:#5b5bd6;--accent2:#7c6ee6;--soft:#efefff;--ok:#16805b;--oksoft:#ecfaf5;
+  --danger:#cf4141;--dangersoft:#fff0f0;--warn:#9b6912;--warnsoft:#fff7df;
+  --shadow:0 20px 55px rgba(60,65,115,.12)
+}
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC",Arial,sans-serif;
+  background:
+   radial-gradient(circle at 8% 8%,rgba(124,110,230,.14),transparent 25%),
+   radial-gradient(circle at 92% 20%,rgba(79,190,175,.12),transparent 24%),
+   linear-gradient(160deg,#f9fbff,#f5f3ff)
+}
+.wrap{width:min(920px,calc(100% - 24px));margin:30px auto 60px}
+.card{background:rgba(255,255,255,.95);border:1px solid rgba(255,255,255,.9);border-radius:28px;padding:32px;box-shadow:var(--shadow)}
+h1{font-size:clamp(30px,5vw,44px);line-height:1.1;margin:0 0 10px;letter-spacing:-.03em}
+h2{font-size:22px;margin:0 0 10px}
+h3{font-size:17px;margin:0 0 8px}
+p{margin:7px 0}.muted{color:var(--muted)}.required{color:var(--danger);font-weight:800}
+.badge{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;background:var(--soft);color:var(--accent);border-radius:999px;font-size:12px;font-weight:800;margin-bottom:14px}
+.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:26px 0}
+.step{background:linear-gradient(#fbfbff,#f3f3ff);border:1px solid #ececf7;border-radius:16px;padding:13px 7px;text-align:center;font-weight:750;color:#4c4d75;font-size:13px}
+.step b{display:block;font-size:22px;margin-bottom:3px}
+.section{margin-top:28px;padding-top:25px;border-top:1px solid var(--line)}
+.field{margin:17px 0}
+label{display:block;font-weight:800;margin-bottom:7px}
+input[type=text],textarea{
+ width:100%;border:1.5px solid var(--line);border-radius:14px;padding:13px 14px;font:inherit;
+ background:#fff;color:var(--text);outline:none;transition:.2s
+}
+input[type=text]:focus,textarea:focus{border-color:var(--accent2);box-shadow:0 0 0 4px rgba(124,110,230,.1)}
+textarea{min-height:160px;resize:vertical;line-height:1.65}
+button{
+ border:0;border-radius:999px;padding:12px 18px;font:inherit;font-weight:800;cursor:pointer;
+ background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;
+ box-shadow:0 8px 20px rgba(91,91,214,.18)
+}
+button:hover:not(:disabled){transform:translateY(-1px)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.secondary{background:#fff;color:#454861;border:1px solid var(--line);box-shadow:none}
+button.danger{background:linear-gradient(135deg,#df4a4a,#bd3749)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.feedback{
+ background:linear-gradient(180deg,#fafaff,#f6f6ff);border:1px solid #e9e8f6;border-radius:18px;padding:18px;margin-top:14px
+}
+.feedback-item{padding:11px 13px;margin:9px 0;background:#fff;border:1px solid #ececf5;border-radius:12px}
+.feedback-item strong{color:var(--accent)}
+.notice{padding:13px 15px;border-radius:14px;background:var(--warnsoft);color:var(--warn);border:1px solid #f2dfaa;font-size:14px}
+.status{margin-top:12px;padding:12px 14px;border-radius:13px;background:#f5f7fb;color:var(--muted);border:1px solid #eceef4}
+.status.ok{background:var(--oksoft);color:var(--ok);border-color:#cdeee1;font-weight:750}
+.status.error{background:var(--dangersoft);color:var(--danger);border-color:#ffd0d0;font-weight:750}
+.video-shell{position:relative;width:100%;aspect-ratio:16/9;background:#131521;border-radius:20px;overflow:hidden;margin:13px 0}
+video{width:100%;height:100%;object-fit:cover;background:#111}
+.timer{font-variant-numeric:tabular-nums;font-weight:900;font-size:22px;color:var(--danger)}
+.hidden{display:none!important}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:17px 0}
+.meta-box{background:#f8f8fc;border:1px solid #ececf4;border-radius:14px;padding:13px 15px}
+.meta-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:800}
+.meta-value{font-weight:800;margin-top:3px}
+.script-box{white-space:pre-wrap;background:#fafaff;border:1px solid #e9e9f5;border-radius:16px;padding:17px;line-height:1.7}
+.sharebox{display:flex;gap:8px;margin-top:10px}.sharebox input{flex:1}
+.small{font-size:13px}
+@media(max-width:650px){
+ .wrap{width:min(100% - 16px,920px);margin:10px auto 28px}.card{padding:21px 17px;border-radius:22px}
+ .steps{grid-template-columns:repeat(5,minmax(80px,1fr));overflow-x:auto}.step{min-width:80px}
+ .meta{grid-template-columns:1fr}.row button{flex:1}.sharebox{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+<section class="card">
+
+<div id="studentView">
+<span class="badge">🎬 一個連結呈現完整學習歷程</span>
+<h1>Dialogue Role Play</h1>
+<p class="muted">先寫對話、取得回饋、修改，再錄下正式演示。老師最後只需要一個分享網址。</p>
+
+<div class="steps">
+ <div class="step"><b>✍️</b>1. 寫對話</div>
+ <div class="step"><b>💡</b>2. 看回饋</div>
+ <div class="step"><b>📝</b>3. 修改</div>
+ <div class="step"><b>🎥</b>4. 錄影</div>
+ <div class="step"><b>🔗</b>5. 分享</div>
+</div>
+
+<div class="field">
+ <label>學生姓名 <span class="required">（必填）</span></label>
+ <input id="studentName" type="text" maxlength="40" placeholder="例如：王小明">
+</div>
+<div class="field">
+ <label>作業名稱 <span class="required">（必填）</span></label>
+ <input id="taskName" type="text" maxlength="100" placeholder="例如：Restaurant Role-play">
+</div>
+
+<section class="section">
+<h2>✍️ Step 1　原始對話稿</h2>
+<p class="muted">請先自己完成英文對話。建議一人一句，角色名稱放在句首。</p>
+<textarea id="originalScript" placeholder="A: Hi! Can I help you?
+B: Yes. I'm looking for a jacket.
+A: What size do you need?
+B: Medium, please."></textarea>
+<div class="row" style="margin-top:12px">
+ <button id="feedbackBtn">💡 取得語言回饋</button>
+</div>
+</section>
+
+<section id="feedbackSection" class="section hidden">
+<h2>💡 Step 2　自動回饋</h2>
+<div class="notice">目前這個試作版先使用「自動語言檢查」來示範完整流程；它不是完整生成式 AI。若這個流程好用，下一階段可再接真正的 AI 回饋服務。</div>
+<div id="feedbackBox" class="feedback"></div>
+</section>
+
+<section id="revisionSection" class="section hidden">
+<h2>📝 Step 3　修改後對話稿</h2>
+<p class="muted">參考上面的回饋，再修改成你真正要演出的版本。</p>
+<textarea id="revisedScript"></textarea>
+</section>
+
+<section id="videoSection" class="section hidden">
+<h2>🎥 Step 4　正式錄影</h2>
+<p class="muted">完成修改後再錄影演示。第一版設定最長 <strong>3 分鐘</strong>，避免影片過大。</p>
+<div class="video-shell">
+ <video id="liveVideo" playsinline muted></video>
+ <video id="playbackVideo" class="hidden" playsinline controls></video>
+</div>
+<div class="row">
+ <button id="cameraBtn" class="secondary">📷 開啟相機</button>
+ <button id="recordBtn" disabled>● 開始錄影</button>
+ <button id="stopBtn" class="danger hidden">■ 停止錄影</button>
+ <button id="redoBtn" class="secondary hidden">↻ 重新錄影</button>
+ <span id="timer" class="timer">00:00</span>
+</div>
+<div id="videoStatus" class="status">請先完成修改稿，再開啟相機。</div>
+</section>
+
+<section id="shareSection" class="section hidden">
+<h2>🔗 Step 5　產生分享網址</h2>
+<p class="muted">老師打開連結後，可看到原稿、系統回饋、修改稿與正式影片。</p>
+<button id="shareBtn">建立分享網址</button>
+<div id="uploadStatus" class="status hidden"></div>
+<div id="shareResult" class="hidden">
+ <div class="sharebox">
+  <input id="shareUrl" type="text" readonly>
+  <button id="copyBtn">複製網址</button>
+ </div>
+</div>
+</section>
+</div>
+
+<div id="viewerView" class="hidden">
+<span class="badge">🎬 Video Dialogue Submission</span>
+<h1 id="viewerTitle">作業歷程</h1>
+<div class="meta">
+ <div class="meta-box"><div class="meta-label">Student</div><div id="vStudent" class="meta-value"></div></div>
+ <div class="meta-box"><div class="meta-label">Task</div><div id="vTask" class="meta-value"></div></div>
+</div>
+
+<section class="section">
+<h2>1. 原始對話稿</h2>
+<div id="vOriginal" class="script-box"></div>
+</section>
+
+<section class="section">
+<h2>2. 系統回饋</h2>
+<div id="vFeedback" class="feedback"></div>
+</section>
+
+<section class="section">
+<h2>3. 修改後對話稿</h2>
+<div id="vRevised" class="script-box"></div>
+</section>
+
+<section class="section">
+<h2>4. 最終錄影</h2>
+<div class="video-shell"><video id="vVideo" controls playsinline></video></div>
+<p id="vSubmitted" class="muted small"></p>
+</section>
+</div>
+
+</section>
+</main>
+
+<script>
+const SUPABASE_URL='https://cufnvllcqoppwydygond.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1Zm52bGxjcW9wcHd5ZHlnb25kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwNTM3OTcsImV4cCI6MjEwNTYyOTc5N30.-UywlVdQRrTlRej37m5PWmtsqS_vRDH2oImO_RKgJC4';
+const BUCKETS=['Recording','RECORDING','recording','recordings'];
+let activeBucket=null;
+
+const $=id=>document.getElementById(id);
+const MAX_SECONDS=180;
+
+let stream=null, recorder=null, chunks=[], videoBlob=null, timerInt=null, startedAt=0;
+let feedbackData=[];
+
+function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]))}
+
+function validateBasics(){
+  if(!$('studentName').value.trim()){alert('請填寫學生姓名。');$('studentName').focus();return false;}
+  if(!$('taskName').value.trim()){alert('請填寫作業名稱。');$('taskName').focus();return false;}
+  if(!$('originalScript').value.trim()){alert('請先輸入原始對話稿。');$('originalScript').focus();return false;}
+  return true;
+}
+
+function makeFeedback(script){
+  const tips=[];
+  const lines=script.split(/\n+/).map(s=>s.trim()).filter(Boolean);
+  const words=script.trim().split(/\s+/).filter(Boolean);
+
+  if(lines.length<4) tips.push({type:'Structure',text:'對話偏短。可以增加問句、回應或結尾，讓互動更完整。'});
+  if(lines.length>=4) tips.push({type:'Structure',text:`目前約有 ${lines.length} 個對話回合，長度適合進一步練習。`});
+
+  const questionCount=(script.match(/\?/g)||[]).length;
+  if(questionCount===0) tips.push({type:'Interaction',text:'目前沒有問句。真實對話通常會有提問與回應，可以考慮加入至少一個問題。'});
+  else tips.push({type:'Interaction',text:`有 ${questionCount} 個問句，已經有互動感。請再確認每個問題後都有自然的回應。`});
+
+  const common=[
+    [/\bI am agree\b/gi,'把 “I am agree” 改成 “I agree”.'],
+    [/\bI very like\b/gi,'把 “I very like …” 改成 “I really like …”.'],
+    [/\bwant to going\b/gi,'want to 後面接原形動詞，例如 “want to go”.'],
+    [/\blet'?s\s+\w+ing\b/gi,'Let’s 後面通常接原形動詞，例如 “Let’s go.”'],
+    [/\bdiscuss about\b/gi,'discuss 後面通常直接接受詞，不需要 about。'],
+    [/\bHow about to\b/gi,'How about 後面可接 V-ing，例如 “How about going …?”']
+  ];
+  common.forEach(([r,msg])=>{if(r.test(script))tips.push({type:'Language',text:msg})});
+
+  if(/\bdo not\b|\bcannot\b|\bI am\b|\bwe are\b/i.test(script))
+    tips.push({type:'Speaking style',text:'如果情境是日常口語，可以適度使用縮寫（don’t, can’t, I’m, we’re），聽起來會更自然。'});
+
+  const veryLong=lines.filter(l=>l.split(/\s+/).length>18);
+  if(veryLong.length) tips.push({type:'Speaking style',text:'有些句子較長。口說演示可以拆成較短的句子，會比較自然也比較好記。'});
+
+  if(words.length<25) tips.push({type:'Length',text:`目前約 ${words.length} 個英文單字。若作業需要完整情境，可以再補一些細節。`});
+  else tips.push({type:'Length',text:`目前約 ${words.length} 個英文單字。正式錄影前，請實際念一次確認長度與節奏。`});
+
+  tips.push({type:'Final check',text:'請自己再檢查：角色是否輪流說話？語氣是否符合情境？最後一句是否有自然的結尾？'});
+  return tips;
+}
+
+function renderFeedback(target, data){
+  target.innerHTML=data.map(x=>`<div class="feedback-item"><strong>${esc(x.type)}</strong><br>${esc(x.text)}</div>`).join('');
+}
+
+$('feedbackBtn').onclick=()=>{
+  if(!validateBasics())return;
+  const s=$('originalScript').value.trim();
+  feedbackData=makeFeedback(s);
+  renderFeedback($('feedbackBox'),feedbackData);
+  $('revisedScript').value=s;
+  $('feedbackSection').classList.remove('hidden');
+  $('revisionSection').classList.remove('hidden');
+  $('videoSection').classList.remove('hidden');
+  $('shareSection').classList.remove('hidden');
+  $('feedbackSection').scrollIntoView({behavior:'smooth',block:'start'});
+};
+
+function bestMime(){
+ const types=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'];
+ return types.find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t))||'';
+}
+function setVideoStatus(text,cls=''){const el=$('videoStatus');el.className='status'+(cls?' '+cls:'');el.textContent=text}
+
+$('cameraBtn').onclick=async()=>{
+ try{
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:true});
+  $('liveVideo').srcObject=stream;$('liveVideo').classList.remove('hidden');$('playbackVideo').classList.add('hidden');
+  await $('liveVideo').play();
+  $('recordBtn').disabled=false;
+  setVideoStatus('相機已開啟。準備好後按「開始錄影」。','ok');
+ }catch(e){setVideoStatus('無法開啟相機或麥克風：'+e.message,'error')}
+};
+
+$('recordBtn').onclick=()=>{
+ if(!$('revisedScript').value.trim()){alert('請先完成修改後對話稿。');return;}
+ if(!stream){alert('請先開啟相機。');return;}
+ chunks=[];videoBlob=null;
+ const mime=bestMime();
+ try{recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined)}catch(e){setVideoStatus('此瀏覽器無法開始錄影：'+e.message,'error');return}
+ recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+ recorder.onstop=()=>{
+   const type=recorder.mimeType||'video/webm';
+   videoBlob=new Blob(chunks,{type});
+   $('playbackVideo').src=URL.createObjectURL(videoBlob);
+   $('playbackVideo').classList.remove('hidden');$('liveVideo').classList.add('hidden');
+   $('redoBtn').classList.remove('hidden');
+   $('recordBtn').classList.add('hidden');$('stopBtn').classList.add('hidden');
+   setVideoStatus(`錄影完成（${(videoBlob.size/1024/1024).toFixed(1)} MB）。請播放確認後再分享。`,'ok');
+ };
+ recorder.start(500);
+ startedAt=Date.now();
+ $('recordBtn').classList.add('hidden');$('stopBtn').classList.remove('hidden');$('redoBtn').classList.add('hidden');
+ setVideoStatus('錄影中…','');
+ updateTimer();timerInt=setInterval(updateTimer,500);
+};
+function updateTimer(){
+ const sec=Math.floor((Date.now()-startedAt)/1000);
+ $('timer').textContent=`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+ if(sec>=MAX_SECONDS) stopRecording();
+}
+function stopRecording(){
+ clearInterval(timerInt);timerInt=null;
+ if(recorder&&recorder.state!=='inactive')recorder.stop();
+}
+$('stopBtn').onclick=stopRecording;
+$('redoBtn').onclick=()=>{
+ videoBlob=null;$('playbackVideo').removeAttribute('src');$('playbackVideo').load();
+ $('playbackVideo').classList.add('hidden');$('liveVideo').classList.remove('hidden');
+ $('recordBtn').classList.remove('hidden');$('recordBtn').disabled=false;$('redoBtn').classList.add('hidden');
+ $('timer').textContent='00:00';setVideoStatus('可以重新錄影。','');
+};
+
+async function uploadOne(bucket,path,body,contentType){
+ const url=`${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeURIComponent(path).replace(/%2F/g,'/')}`;
+ const ctl=new AbortController(),tid=setTimeout(()=>ctl.abort(),180000);
+ try{
+  const r=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${SUPABASE_ANON_KEY}`,apikey:SUPABASE_ANON_KEY,'Content-Type':contentType,'x-upsert':'false'},body,signal:ctl.signal});
+  const txt=await r.text(); if(!r.ok) throw new Error(`${r.status}: ${txt}`); return true;
+ }finally{clearTimeout(tid)}
+}
+function bucketMissing(e){return /bucket not found|nosuchbucket/i.test(String(e&&e.message||e))}
+async function uploadAuto(path,body,contentType){
+ const candidates=activeBucket?[activeBucket,...BUCKETS.filter(x=>x!==activeBucket)]:BUCKETS;
+ let last;
+ for(const b of candidates){
+  try{await uploadOne(b,path,body,contentType);activeBucket=b;return b}catch(e){last=e;if(bucketMissing(e))continue;throw e}
+ }
+ throw last||new Error('找不到 Storage bucket');
+}
+function publicUrl(bucket,path){return `${SUPABASE_URL}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodeURIComponent(path).replace(/%2F/g,'/')}`}
+
+$('shareBtn').onclick=async()=>{
+ if(!validateBasics())return;
+ if(!$('revisedScript').value.trim()){alert('請完成修改後對話稿。');return;}
+ if(!videoBlob){alert('請先完成正式錄影。');return;}
+ const st=$('uploadStatus');st.className='status';st.classList.remove('hidden');st.textContent='正在上傳影片與學習歷程，請不要關閉頁面…';
+ $('shareBtn').disabled=true;
+ try{
+  const id=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));
+  const ext=videoBlob.type.includes('mp4')?'mp4':'webm';
+  const videoPath=`video-dialogue/${id}/final.${ext}`;
+  const metaPath=`video-dialogue/${id}/data.json`;
+  const b=await uploadAuto(videoPath,videoBlob,videoBlob.type||'video/webm');
+  const meta={
+   id,student:$('studentName').value.trim(),task:$('taskName').value.trim(),
+   originalScript:$('originalScript').value.trim(),feedback:feedbackData,
+   revisedScript:$('revisedScript').value.trim(),videoPath,bucket:b,
+   submittedAt:new Date().toISOString()
+  };
+  await uploadOne(b,metaPath,new Blob([JSON.stringify(meta)],{type:'application/json'}),'application/json');
+  const u=new URL(location.href);u.search='';u.hash='';u.searchParams.set('submission',id);u.searchParams.set('bucket',b);
+  $('shareUrl').value=u.toString();$('shareResult').classList.remove('hidden');
+  st.className='status ok';st.textContent='完成！請複製下面的網址繳交給老師。';
+ }catch(e){
+  st.className='status error';st.textContent='上傳失敗：'+(e.name==='AbortError'?'影片上傳逾時，請確認網路或縮短影片。':e.message);
+ }finally{$('shareBtn').disabled=false}
+};
+
+$('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText($('shareUrl').value);$('copyBtn').textContent='已複製！';setTimeout(()=>$('copyBtn').textContent='複製網址',1300)}catch(e){$('shareUrl').select();document.execCommand('copy')}};
+
+async function loadSubmission(){
+ const qs=new URLSearchParams(location.search),id=qs.get('submission');if(!id)return;
+ $('studentView').classList.add('hidden');$('viewerView').classList.remove('hidden');
+ let buckets=qs.get('bucket')?[qs.get('bucket'),...BUCKETS.filter(x=>x!==qs.get('bucket'))]:BUCKETS;
+ let meta=null,b=null;
+ for(const candidate of buckets){
+  const url=publicUrl(candidate,`video-dialogue/${id}/data.json`);
+  try{const r=await fetch(url,{cache:'no-store'});if(r.ok){meta=await r.json();b=candidate;break}}catch(e){}
+ }
+ if(!meta){$('viewerTitle').textContent='找不到這份作業';return}
+ b=meta.bucket||b;
+ $('vStudent').textContent=meta.student||'—';$('vTask').textContent=meta.task||'—';
+ $('vOriginal').textContent=meta.originalScript||'';
+ renderFeedback($('vFeedback'),meta.feedback||[]);
+ $('vRevised').textContent=meta.revisedScript||'';
+ $('vVideo').src=publicUrl(b,meta.videoPath);
+ $('vSubmitted').textContent='提交時間：'+new Date(meta.submittedAt).toLocaleString();
+}
+loadSubmission();
+</script>
+</body>
+</html>
